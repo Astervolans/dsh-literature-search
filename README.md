@@ -192,11 +192,13 @@ node test/probe-scholar.mjs    # 连通性诊断：status / 结果块数 / 是�
 - `tools/fetch-dev-deps.mjs` 走另一条路：按 `.dev-deps/package.json` 里钉住的版本
   从 npm 装同一批包，再软链到 `node_modules/`。适合没装 DSH Desktop 的机器和 CI
   （`.github/workflows/ci.yml` 在 Ubuntu + Windows × Node 22/24 上跑全部离线用例）。
-- 离线共 **58 个用例**：MEDLINE 解析 7、Scholar 解析/分页 6、插件与工具 21（含
+- 离线共 **62 个用例**：MEDLINE 解析 7、Scholar 解析/分页 6、插件与工具 21（含
   「settings 写入后 Scholar 即时切换后端」「凭据写入后无需重启生效」「实时条数上限」）、
-  设置路由 14、客户端 bundle 6、配置漂移 4。全部用桩 `fetch`/假服务，不联网。
+  设置路由 14、客户端 bundle 10、配置漂移 4。全部用桩 `fetch`/假服务，不联网。
 - 客户端 bundle 套件用桩 `window.__ModuleLoader__` + 极简 React shim 真正执行并遍历渲染树，
   能在没有浏览器的情况下抓出设置页里的拼写错误与空引用（已借此修掉一个 `state.drafts` 空值崩溃）。
+  0.2.2 起它会展开函数组件做深度渲染，因此子组件拥有的节点（如密钥字段的按钮）也能断言，
+  并直接守住主题回归：主按钮必须用成对的 token、不得把 `--dsw-alias-brand-primary` 当填充色。
 - 在线测试把**上游不可用**（无出网 / DNS / 超时 / HTTP 429 / 反爬页）记为 SKIP 而不是 FAIL，
   因为那是环境或对方策略问题；只有“页面里有结果块但解析出 0 条”才判失败。
   实测：Google Scholar HTML 5/5 通过；PubMed 在本机出网时好时坏，不通时会明确打印 SKIP 与原因。

@@ -31,8 +31,14 @@ function collectStrings(node, out = []) {
 /** Minimal React shim seeded with one state value so the card renders. */
 function createReactShim(seedState) {
 	const createElement = (type, props) => ({ type, props: props ?? {} });
+	let useStateCalls = 0;
 	const React = {
-		useState: () => [seedState, () => {}],
+		// The tab's own state is the first hook call of a render pass; later
+		// useState calls (the per-slot key drafts) must get their real initial.
+		useState: (initial) => {
+			useStateCalls += 1;
+			return [useStateCalls === 1 ? seedState : initial, () => {}];
+		},
 		useEffect: () => {},
 		useCallback: (fn) => fn,
 		useRef: (initial) => ({ current: initial ?? {} })
@@ -43,6 +49,43 @@ function createReactShim(seedState) {
 		Fragment: 'Fragment'
 	};
 	return { React, jsxRuntime };
+}
+
+/**
+ * Expand function components the way React would, so nodes owned by child
+ * components (the credential fields' buttons) become reachable. Hooks are the
+ * shim's, so this is only safe for a single render pass.
+ */
+function renderDeep(node) {
+	if (node === null || node === undefined) return node;
+	if (Array.isArray(node)) return node.map(renderDeep);
+	if (typeof node !== 'object') return node;
+	if (typeof node.type === 'function') return renderDeep(node.type({ ...node.props }));
+	return { ...node, props: { ...node.props, children: renderDeep(node.props?.children) } };
+}
+
+/** Every node of one element type in a rendered tree. */
+function collectNodes(node, type, out = []) {
+	if (node === null || node === undefined || typeof node !== 'object') return out;
+	if (Array.isArray(node)) {
+		for (const child of node) collectNodes(child, type, out);
+		return out;
+	}
+	if (node.type === type) out.push(node);
+	collectNodes(node.props?.children, type, out);
+	return out;
+}
+
+/** Every inline style object in a rendered tree. */
+function collectStyles(node, out = []) {
+	if (node === null || node === undefined || typeof node !== 'object') return out;
+	if (Array.isArray(node)) {
+		for (const child of node) collectStyles(child, out);
+		return out;
+	}
+	if (node.props?.style !== undefined && typeof node.props.style === 'object') out.push(node.props.style);
+	collectStyles(node.props?.children, out);
+	return out;
 }
 
 /** Bumped per load so each test gets a fresh module instance. */
@@ -205,6 +248,60 @@ suite.test('test results render with their hints', async () => {
 	const strings = collectStrings(exports.LiteratureSettingsTab()).join('\n');
 	assert.match(strings, /E-utilities OK/);
 	assert.match(strings, /Google Scholar is unreachable/);
+});
+
+suite.test('primary buttons stay legible in both themes', async () => {
+	// Regression guard for the dark-mode defect: the first-party pairing is
+	// `--dsw-alias-label-primary` fill over `--dsw-alias-bg-layer-3` label, and
+	// both swap together per theme. A literal white label is what made the
+	// buttons unreadable, because `--dsw-alias-brand-primary` is near-white in
+	// dark mode.
+	const { exports } = await loadClientBundle(readyState());
+	const tree = renderDeep(exports.LiteratureSettingsTab());
+	const buttons = collectNodes(tree, 'button');
+	assert.equal(buttons.length >= 2, true, `expected buttons in the card, found ${buttons.length}`);
+	const primary = buttons.filter((button) => /保存/.test(collectStrings(button).join('')));
+	assert.equal(primary.length >= 2, true, 'expected the save-key and save-and-apply buttons');
+	for (const button of primary) {
+		const style = button.props.style;
+		// The defect was a token-driven fill (which flips per theme) next to a
+		// literal label (which does not). Both halves must therefore be tokens; a
+		// hex value is only acceptable *inside* the var() fallback.
+		assert.match(String(style.background), /^var\(--dsw-alias-label-primary/, 'primary fill must be the label-primary token');
+		assert.match(String(style.color), /^var\(--dsw-alias-bg-layer-3/, 'primary label must be the paired surface token');
+	}
+});
+
+suite.test('no style paints a brand token behind a fixed colour', async () => {
+	const { exports } = await loadClientBundle(readyState());
+	const styles = collectStyles(renderDeep(exports.LiteratureSettingsTab()));
+	assert.equal(styles.length > 0, true);
+	for (const style of styles) {
+		const fill = String(style.background ?? style.backgroundColor ?? '');
+		assert.doesNotMatch(fill, /--dsw-alias-brand-primary/, 'brand-primary is an accent/outline token, never a fill');
+	}
+});
+
+suite.test('disabled buttons use the first-party 40% opacity', async () => {
+	const { exports } = await loadClientBundle(readyState());
+	const tree = renderDeep(exports.LiteratureSettingsTab());
+	const buttons = collectNodes(tree, 'button');
+	// The empty key draft leaves "保存密钥" disabled.
+	const disabled = buttons.filter((button) => button.props.disabled === true);
+	assert.equal(disabled.length > 0, true, 'expected at least one disabled button');
+	for (const button of disabled) {
+		assert.equal(button.props.style.opacity, 0.4);
+		assert.equal(button.props.style.cursor, 'not-allowed');
+	}
+});
+
+suite.test('status colours come from state tokens, not hardcoded hex', async () => {
+	const { exports } = await loadClientBundle(readyState());
+	const styles = collectStyles(renderDeep(exports.LiteratureSettingsTab()));
+	const flattened = styles.map((style) => `${style.color ?? ''}|${style.background ?? ''}`).join('\n');
+	assert.match(flattened, /--dsw-alias-state-(success|error|warn)-primary/);
+	// `--dsw-alias-label-error` does not exist in the theme, so it must not be used.
+	assert.doesNotMatch(flattened, /--dsw-alias-label-error/);
 });
 
 if (isMain(import.meta.url)) {

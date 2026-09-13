@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] — 2026-09-13
+
+### Fixed
+
+- **The settings card was unreadable in dark mode.** The primary buttons paired
+  a `--dsw-alias-brand-primary` fill — which is near-white (`#f9fafb`) in dark
+  mode — with a literal `#fff` label, so the text disappeared into the button.
+  They now use the first-party pairing `--dsw-alias-label-primary` fill over
+  `--dsw-alias-bg-layer-3` label; those two tokens swap together per theme, so
+  the label stays legible in both.
+- Status colours come from the `--dsw-alias-state-{success,warn,error}-*` tokens
+  instead of hardcoded hex, so badges and hints survive a theme switch. The
+  non-existent `--dsw-alias-label-error` token is no longer referenced.
+
+### Changed
+
+- Secondary buttons use the first-party ghost treatment: transparent fill, a
+  `--dsw-alias-border-l2` outline and the secondary label colour.
+- Disabled buttons use the first-party 40% opacity, down from 50%.
+- CI: `actions/checkout` and `actions/setup-node` bumped to v6, which runs on the
+  Node 24 runtime and clears the Node 20 deprecation annotations.
+
+### Tests
+
+- The client bundle suite grew from 6 to 10 cases. It now has deep-render
+  helpers that expand function components the way React would, so nodes owned by
+  child components — the credential fields' buttons — are reachable from a test.
+  The new cases guard the theme regressions directly: primary buttons must use
+  the paired tokens, no style may paint `--dsw-alias-brand-primary` behind a
+  fixed colour, disabled buttons must sit at 0.4 opacity, and status colours must
+  come from state tokens rather than literals.
+
 ## [0.2.1] — 2026-09-13
 
 First public release. Earlier 0.1.x–0.2.x iterations were developed privately
@@ -53,5 +85,6 @@ inside a DSH workspace and are folded into this version.
   reports HTTP 429 / anti-bot pages as explicit errors rather than silently
   returning empty results.
 
-[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.1
