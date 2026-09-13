@@ -90,8 +90,32 @@ A blocked, throttled or unreachable upstream is reported as `SKIP`. Only
 - **Keep the two config surfaces in sync.** `cordis.patch.yml`, the embedded
   row in `install.ps1` and the `Config` schema in `lib/index.js` are checked by
   the `config` suite. Adding a key means touching all three.
+- **Keep the two READMEs in sync.** `README.md` is English and is what npm
+  renders, so it is the primary one; `README.zh-CN.md` holds the Chinese
+  original. A user-facing change belongs in both, and each file links to the
+  other at the top. `docs/API-RESEARCH.md` is Chinese only — that is fine, it is
+  a research record rather than the front page.
 - **Document upstream limits you rely on** in `docs/API-RESEARCH.md`, with the
   evidence you gathered.
+
+## Releasing
+
+The plugin is published to npm as `dsh-literature-search`. Publishing is what
+makes the 1024 Store list an install command for it — the store detects a
+published manifest that declares `dsh.bundle`, so no catalog change is needed
+after the first release.
+
+1. Update `CHANGELOG.md` and bump `version` in `package.json`.
+2. Confirm the package contents: `npm pack --dry-run`. `package.json` and
+   `cordis.patch.yml` **must** both be in the tarball — the latter is the
+   `dsh.bundle.patch` the harness loads.
+3. `npm publish`. `prepublishOnly` runs the offline suite first and aborts the
+   publish if anything fails.
+4. Tag and push: `git tag -a vX.Y.Z -m "..."` then `git push origin main --tags`.
+5. Create the GitHub release from the same changelog section.
+
+Note that npm does not allow republishing a version, so a mistake means
+publishing the next patch rather than overwriting.
 
 ## Submitting a change
 

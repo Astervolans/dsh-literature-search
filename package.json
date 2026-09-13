@@ -1,6 +1,6 @@
 {
   "name": "dsh-literature-search",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Literature search for DeepSeek Harness over the official PubMed NCBI E-utilities API (esearch/esummary/efetch/elink) and Google Scholar (SerpApi engine, or direct HTML parsing because Google publishes no Scholar API). Zero runtime dependencies.",
   "type": "module",
   "main": "lib/index.js",
@@ -19,7 +19,9 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
-    "CHANGELOG.md"
+    "README.zh-CN.md",
+    "CHANGELOG.md",
+    "docs"
   ],
   "license": "MIT",
   "author": "Qin Yifei",
@@ -37,6 +39,7 @@
   "keywords": [
     "deepseek-harness",
     "dsh",
+    "dsh-plugin",
     "plugin",
     "literature",
     "pubmed",
@@ -63,13 +66,28 @@
     "test:live:pubmed": "node test/live-pubmed.mjs",
     "test:live:scholar": "node test/live-scholar.mjs",
     "probe:scholar": "node test/probe-scholar.mjs",
-    "cli": "node cli.mjs"
+    "cli": "node cli.mjs",
+    "prepublishOnly": "node test/run-all.mjs"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6",
     "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
     "@deepseek-ai/schemastery": "^3.18.1"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/cordis": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-system-prompt": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-tools": {
+      "optional": true
+    },
+    "@deepseek-ai/schemastery": {
+      "optional": true
+    }
   }
 }
 

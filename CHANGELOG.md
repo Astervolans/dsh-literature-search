@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] — 2026-09-13
+
+First release published to npm. Installing is now
+`dsh plugin --profile desktop add dsh-literature-search`: that command forwards
+to pnpm inside the profile and reconciles the bundle layer list by installed
+state, so a dependency declaring `dsh.bundle` joins the stack on its own.
+
+### Added
+
+- **English README** as the primary `README.md`, with the Chinese original kept
+  in full as `README.zh-CN.md`. The two link to each other.
+- `docs/` now ships in the package, so the `docs/API-RESEARCH.md` link in the
+  README resolves for anyone who installs from npm rather than cloning.
+- `dsh-plugin` keyword, matching the GitHub topic used for catalog discovery.
+
+### Changed
+
+- **The DSH peer dependencies are now marked optional** via
+  `peerDependenciesMeta`. They are supplied by the DSH runtime, and without this
+  npm tries to resolve their own peer graph on install — which fails with an
+  `ERESOLVE` conflict for `@deepseek-ai/dsh-tools`. Marking them optional keeps
+  `npm install dsh-literature-search` working while preserving the declaration
+  for hosts that do resolve them.
+- The README install section leads with the npm command and keeps `install.ps1`
+  as the documented offline route.
+
+### Security
+
+- `npm publish` is now gated behind `prepublishOnly`, which runs the full
+  offline suite, so a broken package cannot be published by accident.
+
 ## [0.2.2] — 2026-09-13
 
 ### Fixed
@@ -85,6 +116,7 @@ inside a DSH workspace and are folded into this version.
   reports HTTP 429 / anti-bot pages as explicit errors rather than silently
   returning empty results.
 
-[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.3
 [0.2.2]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.1
