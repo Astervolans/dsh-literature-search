@@ -91,10 +91,19 @@ A blocked, throttled or unreachable upstream is reported as `SKIP`. Only
   row in `install.ps1` and the `Config` schema in `lib/index.js` are checked by
   the `config` suite. Adding a key means touching all three.
 - **Keep the two READMEs in sync.** `README.md` is English and is what npm
-  renders, so it is the primary one; `README.zh-CN.md` holds the Chinese
-  original. A user-facing change belongs in both, and each file links to the
-  other at the top. `docs/API-RESEARCH.md` is Chinese only — that is fine, it is
-  a research record rather than the front page.
+  renders, so it is the primary one; the Chinese original lives at
+  `docs/README.zh-CN.md`. A user-facing change belongs in both, and each file
+  links to the other at the top. `docs/API-RESEARCH.md` is Chinese only — that
+  is fine, it is a research record rather than the front page.
+- **Never put a `README.<locale>.md` in the package root.** npm picks the
+  package readme by globbing `{README,README.*}` and taking the first match
+  ending in a markdown extension, and in that order `README.zh-CN.md` sorts
+  *before* `README.md` — so a translated readme silently becomes the npm page
+  and the English one is ignored. That is exactly what shipped in 0.2.3. Keep
+  translations under `docs/` (which also keeps the root tidy), and after moving
+  anything, re-check the choice with npm's own glob:
+  `node -e "require('glob')('{README,README.*}',{nocase:true}).then(console.log)"`
+  against the npm that will publish.
 - **Document upstream limits you rely on** in `docs/API-RESEARCH.md`, with the
   evidence you gathered.
 

@@ -1,6 +1,6 @@
 {
   "name": "dsh-literature-search",
-  "version": "0.2.3",
+  "version": "0.2.4",
   "description": "Literature search for DeepSeek Harness over the official PubMed NCBI E-utilities API (esearch/esummary/efetch/elink) and Google Scholar (SerpApi engine, or direct HTML parsing because Google publishes no Scholar API). Zero runtime dependencies.",
   "type": "module",
   "main": "lib/index.js",
@@ -19,7 +19,6 @@
     "lib",
     "cordis.patch.yml",
     "README.md",
-    "README.zh-CN.md",
     "CHANGELOG.md",
     "docs"
   ],

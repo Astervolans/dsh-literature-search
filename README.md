@@ -1,6 +1,6 @@
 # dsh-literature-search
 
-**English** · [中文](README.zh-CN.md)
+**English** · [中文](docs/README.zh-CN.md)
 
 [![CI](https://github.com/Astervolans/dsh-literature-search/actions/workflows/ci.yml/badge.svg)](https://github.com/Astervolans/dsh-literature-search/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
@@ -291,7 +291,9 @@ dsh-literature-search/
 │   ├── extract-dev-deps.mjs   # Extract the test runtime closure from app.asar
 │   └── fetch-dev-deps.mjs     # Install the same packages from npm (CI / no DSH)
 ├── test/            # Offline suites (incl. settings routes and client bundle) + live smoke + fixtures
-├── docs/API-RESEARCH.md
+├── docs/
+│   ├── API-RESEARCH.md      # The API research behind these choices (Chinese)
+│   └── README.zh-CN.md      # Chinese README — deliberately not in the package root
 ├── .github/         # CI workflow + issue / PR templates
 ├── .dev-deps/package.json   # Pins the DSH runtime versions used by the offline suite (the only tracked file there)
 ├── cli.mjs          # Command-line verification that does not load DSH

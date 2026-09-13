@@ -1,11 +1,17 @@
 # dsh-literature-search
 
-[English](README.md) · **中文**
+[English](../README.md) · **中文**
+
+> 本文件位于 `docs/` 而不是仓库根目录，是**刻意为之**：npm 用 `{README,README.*}`
+> 这个 glob 选包页面用的 README，并把结果排序后取第一个匹配 `*.md` 的文件。
+> 在这个排序里 `README.zh-CN.md` 排在 `README.md` **前面**，所以根目录下的任何
+> `README.<语言>.md` 都会把主 README 顶掉 —— 0.2.3 首次发布时 npm 页面上显示的
+> 就是中文版。放到 `docs/` 后 glob 不再匹配它，英文版才成为包页面内容。
 
 [![CI](https://github.com/Astervolans/dsh-literature-search/actions/workflows/ci.yml/badge.svg)](https://github.com/Astervolans/dsh-literature-search/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
 [![npm](https://img.shields.io/npm/v/dsh-literature-search.svg)](https://www.npmjs.com/package/dsh-literature-search)
-[![Runtime dependencies: 0](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen.svg)](package.json)
+[![Runtime dependencies: 0](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen.svg)](../package.json)
 
 DeepSeek Harness（dsh）插件：通过 **PubMed 官方 E-utilities API** 与 **Google Scholar** 检索文献，
 把结果统一成同一种 paper 结构返回给模型。
@@ -17,7 +23,7 @@ DeepSeek Harness（dsh）插件：通过 **PubMed 官方 E-utilities API** 与 *
 - **零运行时依赖**：只用 Node 内置 `fetch` / `AbortSignal`，`@deepseek-ai/*` 由 DSH 运行时提供，无需 `npm install`。
 - **设置界面**：在 **设置 → 插件 → 文献检索** 里有专属配置页，可直接填 NCBI / SerpAPI 密钥、切换 Scholar 后端、调速率与返回条数，并一键测试连通性。
 
-> 详细的 API 调研（参数、速率、返回格式、实测证据、选型理由）见 [`docs/API-RESEARCH.md`](docs/API-RESEARCH.md)。
+> 详细的 API 调研（参数、速率、返回格式、实测证据、选型理由）见 [`docs/API-RESEARCH.md`](API-RESEARCH.md)。
 
 ## 工具
 
@@ -240,7 +246,9 @@ dsh-literature-search/
 │   ├── extract-dev-deps.mjs   # 从 app.asar 抽取测试所需的 DSH 运行时闭包
 │   └── fetch-dev-deps.mjs     # 从 npm 装同一批包（CI / 没装 DSH 的机器）
 ├── test/            # 离线套件（含设置路由与客户端 bundle）+ 在线冒烟 + fixtures
-├── docs/API-RESEARCH.md
+├── docs/
+│   ├── API-RESEARCH.md      # API 调研（本文件）
+│   └── README.zh-CN.md      # 中文 README —— 刻意不放仓库根目录
 ├── .github/         # CI 工作流 + Issue / PR 模板
 ├── .dev-deps/package.json   # 钉住离线测试用的 DSH 运行时版本（只有这一个文件入库）
 ├── cli.mjs          # 脱离 DSH 的命令行验证
@@ -294,12 +302,12 @@ PubMed 不受影响：`eutils.ncbi.nlm.nih.gov` 在同样网络下可直接访�
 
 ## 参与贡献
 
-欢迎 Issue 与 PR：开发环境、测试命令和代码约定见 [`CONTRIBUTING.md`](CONTRIBUTING.md)；
-变更历史见 [`CHANGELOG.md`](CHANGELOG.md)。
+欢迎 Issue 与 PR：开发环境、测试命令和代码约定见 [`CONTRIBUTING.md`](../CONTRIBUTING.md)；
+变更历史见 [`CHANGELOG.md`](../CHANGELOG.md)。
 
-发现安全问题时请不要开公开 Issue，改走 [`SECURITY.md`](SECURITY.md) 里的私下渠道 ——
+发现安全问题时请不要开公开 Issue，改走 [`SECURITY.md`](../SECURITY.md) 里的私下渠道 ——
 本插件会接触 NCBI / SerpApi 密钥，密钥泄漏路径都按安全问题处理。
 
 ## License
 
-[MIT](LICENSE)
+[MIT](../LICENSE)

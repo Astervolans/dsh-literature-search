@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] — 2026-09-13
+
+### Fixed
+
+- **The npm package page showed the Chinese README.** npm selects the package
+  readme by globbing `{README,README.*}` in the package root and taking the
+  first result whose name ends in a markdown extension — and in that glob's
+  order `README.zh-CN.md` sorts **before** `README.md`. So 0.2.3 went out with
+  the translation as its readme. The Chinese README now lives at
+  `docs/README.zh-CN.md`, outside the glob's non-recursive pattern, and
+  `npm pack` was re-checked against npm's own selection logic to confirm
+  `README.md` is chosen. This is a display-only fix: the shipped code in 0.2.3
+  is unchanged and worked correctly.
+
 ## [0.2.3] — 2026-09-13
 
 First release published to npm. Installing is now
@@ -116,7 +130,8 @@ inside a DSH workspace and are folded into this version.
   reports HTTP 429 / anti-bot pages as explicit errors rather than silently
   returning empty results.
 
-[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.4
 [0.2.3]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.3
 [0.2.2]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.2
 [0.2.1]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.1
