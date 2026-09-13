@@ -1,0 +1,126 @@
+name: Bug report
+description: Something in dsh-literature-search is broken or behaves unexpectedly.
+title: '[Bug]: '
+labels: ['bug', 'needs triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Two things make bugs in this plugin much faster to fix:
+
+        1. **Which backend** — PubMed (E-utilities) and Google Scholar (SerpApi / HTML)
+           fail in completely different ways.
+        2. **The raw error text.** The plugin deliberately surfaces upstream failures
+           (HTTP 429, anti-bot pages, timeouts) instead of returning empty results, so
+           the message usually names the cause.
+
+  - type: dropdown
+    id: tool
+    attributes:
+      label: Which tool?
+      options:
+        - pubmed_search
+        - pubmed_paper
+        - pubmed_related
+        - scholar_search
+        - scholar_cite
+        - Settings page (Settings → Plugins → Literature Search)
+        - install.ps1 / uninstall.ps1
+        - Test suite
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: scholar-backend
+    attributes:
+      label: Scholar backend in use
+      description: Only relevant for the scholar_* tools. Shown on the settings page.
+      options:
+        - Not applicable (PubMed only)
+        - auto
+        - serpapi
+        - html
+        - Unknown
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: The exact tool call, the arguments you passed, and the full result or error.
+      placeholder: |
+        Tool call: pubmed_search({"query": "asthma[Title/Abstract]", "max_results": 5})
+        Result: ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+    validations:
+      required: true
+
+  - type: input
+    id: dsh-version
+    attributes:
+      label: DSH version
+      description: Desktop app version, or the `dsh` CLI version.
+      placeholder: e.g. 0.1.5-rc.1
+    validations:
+      required: true
+
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+      description: Output of `node --version`.
+      placeholder: e.g. v24.4.0
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: e.g. Windows 11 24H2, macOS 15.2, Ubuntu 24.04
+    validations:
+      required: true
+
+  - type: dropdown
+    id: credentials
+    attributes:
+      label: Are credentials configured?
+      description: Never paste a key here — just say whether one is set.
+      options:
+        - Neither NCBI_API_KEY nor SERPAPI_API_KEY
+        - NCBI_API_KEY only
+        - SERPAPI_API_KEY only
+        - Both
+        - Prefer not to say
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics (optional)
+      description: |
+        The settings page writes a key-free diagnostic file to
+        `$DSH_HOME/.dsh-literature-search/diagnostics.json`. Its contents help
+        with "I saved a key but it still says unconfigured".
+      render: json
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I have not pasted any API key, token or personal data above.
+          required: true

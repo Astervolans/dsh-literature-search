@@ -1,0 +1,62 @@
+name: Feature request
+description: Suggest a new tool, backend or capability for dsh-literature-search.
+title: '[Feature]: '
+labels: ['enhancement']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        This plugin is deliberately small: **zero runtime dependencies**, two
+        backends, one shared `paper` structure. Proposals that fit that shape
+        are the easiest to accept.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: What is this about?
+      options:
+        - A new literature backend (arXiv, Crossref, Semantic Scholar, Europe PMC, …)
+        - A new tool on an existing backend
+        - PubMed behaviour
+        - Google Scholar behaviour
+        - Settings page / configuration
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the research workflow that is awkward or impossible today.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: |
+        If you are proposing a new backend, say whether it has an official,
+        documented HTTP API and what its rate limits are — that is the single
+        most important factor in whether it can be added.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and pull requests for this idea.
+          required: true
+        - label: This does not require adding a runtime npm dependency.
+          required: false

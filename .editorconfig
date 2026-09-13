@@ -1,0 +1,31 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# The JavaScript sources are tab-indented.
+[*.{js,mjs,cjs}]
+indent_style = tab
+indent_size = 4
+
+# Data and prose files are space-indented.
+[*.{json,yml,yaml,md}]
+indent_style = space
+indent_size = 2
+
+# PowerShell scripts are space-indented.
+[*.ps1]
+indent_style = space
+indent_size = 4
+
+# Markdown uses two trailing spaces for a hard line break.
+[*.md]
+trim_trailing_whitespace = false
+
+# Captured upstream payloads are compared byte-wise by the parsers.
+[test/fixtures/**]
+insert_final_newline = false
+trim_trailing_whitespace = false

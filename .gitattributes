@@ -1,0 +1,22 @@
+# Normalize every text file to LF in the repository so the same bytes are
+# checked out on Windows, macOS and Linux.
+* text=auto eol=lf
+
+# PowerShell scripts must stay runnable from Windows PowerShell 5.1 and
+# PowerShell 7+; LF works in both.
+*.ps1 text eol=lf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary assets are never converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+
+# Keep GitHub's linguist from counting vendored/test fixtures as source.
+test/fixtures/* linguist-vendored
+docs/* linguist-documentation

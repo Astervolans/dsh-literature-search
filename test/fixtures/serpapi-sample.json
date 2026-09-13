@@ -1,0 +1,48 @@
+{
+  "search_metadata": { "id": "test", "status": "Success" },
+  "search_parameters": { "engine": "google_scholar", "q": "CRISPR base editing", "hl": "en" },
+  "organic_results": [
+    {
+      "position": 1,
+      "title": "Programmable editing of a target base in genomic DNA without double-stranded DNA cleavage",
+      "result_id": "abc123xyz",
+      "link": "https://www.nature.com/articles/nature17946",
+      "snippet": "Cytidine deaminase fused to catalytically dead Cas9 converts C to U.",
+      "publication_info": {
+        "summary": "AC Komor, YB Kim, MS Packer, JA Zuris, DR Liu - Nature, 2016 - nature.com",
+        "authors": [
+          { "name": "AC Komor", "link": "https://scholar.google.com/citations?user=aaa" },
+          { "name": "YB Kim", "link": "https://scholar.google.com/citations?user=bbb" }
+        ]
+      },
+      "inline_links": {
+        "cited_by": {
+          "total": 3120,
+          "link": "https://scholar.google.com/scholar?cites=2222222222&as_sdt=2005"
+        },
+        "versions": { "total": 12, "link": "https://scholar.google.com/scholar?cluster=9876543210" }
+      },
+      "resources": [
+        { "title": "PDF", "file_format": "PDF", "link": "https://www.nature.com/articles/nature17946.pdf" }
+      ]
+    },
+    {
+      "position": 2,
+      "title": "Base editing: precision chemistry on the genome and transcriptome of living cells",
+      "result_id": "def456uvw",
+      "link": "https://www.nature.com/articles/s41576-018-0059-1",
+      "snippet": "Base editors perform targeted point mutations without double-strand breaks.",
+      "publication_info": {
+        "summary": "HA Rees, DR Liu - Nature Reviews Genetics, 2018 - nature.com",
+        "authors": [{ "name": "HA Rees" }, { "name": "DR Liu" }]
+      },
+      "inline_links": {
+        "cited_by": { "total": 2100, "link": "https://scholar.google.com/scholar?cites=4444444444" }
+      }
+    }
+  ],
+  "pagination": {
+    "current": 1,
+    "next": "https://serpapi.com/search.json?engine=google_scholar&q=CRISPR+base+editing&start=10"
+  }
+}

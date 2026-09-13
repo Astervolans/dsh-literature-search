@@ -1,0 +1,66 @@
+
+PMID- 33301246
+OWN - NLM
+STAT- MEDLINE
+VI  - 383
+IP  - 27
+DP  - 2020 Dec 31
+TI  - Safety and Efficacy of the BNT162b2 mRNA Covid-19 Vaccine.
+PG  - 2603-2615
+LID - 10.1056/NEJMoa2034577 [doi]
+AB  - BACKGROUND: Severe acute respiratory syndrome coronavirus 2 (SARS-CoV-2) 
+      infection and the resulting coronavirus disease 2019 (Covid-19) have afflicted 
+      tens of millions of people in a worldwide pandemic. METHODS: In an ongoing 
+      multinational, placebo-controlled, observer-blinded, pivotal efficacy trial, we 
+      randomly assigned persons 16 years of age or older in a 1:1 ratio to receive two 
+      doses, 21 days apart. RESULTS: BNT162b2 was 95% effective in preventing Covid-19. 
+      CONCLUSIONS: A two-dose regimen of BNT162b2 conferred 95% protection.
+CI  - Copyright (c) 2020 Massachusetts Medical Society.
+FAU - Polack, Fernando P
+AU  - Polack FP
+FAU - Thomas, Stephen J
+AU  - Thomas SJ
+FAU - Gruber, William C
+AU  - Gruber WC
+CN  - C4591001 Clinical Trial Group
+LA  - eng
+PT  - Clinical Trial, Phase III
+PT  - Journal Article
+PT  - Randomized Controlled Trial
+DEP - 20201210
+PL  - United States
+TA  - N Engl J Med
+JT  - The New England journal of medicine
+CIN - N Engl J Med. 2020 Dec 31;383(27):2677-2678. doi: 10.1056/NEJMe2034717. PMID: 
+      33301245
+MH  - BNT162 Vaccine
+MH  - COVID-19/immunology/*prevention & control
+MH  - Female
+MH  - *SARS-CoV-2/genetics
+OT  - covid-19
+OT  - mRNA vaccine
+PMC - PMC7745181
+SO  - N Engl J Med. 2020 Dec 31;383(27):2603-2615. doi: 10.1056/NEJMoa2034577. Epub 
+      2020 Dec 10.
+
+PMID- 33449100
+DP  - 2021 Jan 15
+TI  - CRISPR/Cas9 and base editing in cancer.
+LID - 10.1042/BST20200550 [doi]
+AB  - Base editors allow the direct conversion of one DNA base into another without 
+      double-strand breaks.
+FAU - Renz, Julia
+AU  - Renz J
+FAU - Herold, Marco J
+AU  - Herold MJ
+PT  - Journal Article
+PT  - Review
+JT  - Biochemical Society transactions
+TA  - Biochem Soc Trans
+VI  - 49
+IP  - 1
+PG  - 1-10
+PMC - PMC7925010
+MH  - CRISPR-Cas Systems/genetics
+MH  - Gene Editing/methods
+MH  - Neoplasms/genetics

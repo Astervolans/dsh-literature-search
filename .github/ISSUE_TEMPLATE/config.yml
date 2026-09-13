@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Google Scholar is unreachable or returns HTTP 429
+    url: https://github.com/Astervolans/dsh-literature-search#scholargooglecom-连不上时怎么办
+    about: This is expected behaviour without a SerpApi key — check the README first.
+  - name: Security vulnerability
+    url: https://github.com/Astervolans/dsh-literature-search/security/policy
+    about: Please report security issues privately instead of opening an issue.

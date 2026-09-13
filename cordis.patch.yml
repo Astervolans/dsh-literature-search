@@ -1,0 +1,37 @@
+# dsh-literature-search bundle patch: one insert over the profile root.
+# The row id `literature-search` is unique; the same block can be applied as a
+# profile bundle (`dsh plugin add`) or merged into the profile's own
+# cordis.patch.yml (see install.ps1, which appends this row).
+- insert:
+    - id: literature-search
+      name: dsh-literature-search
+      config:
+        enabled: true
+        # --- PubMed (official NCBI E-utilities; free, no key required) ---
+        pubmedEnabled: true
+        pubmedBaseUrl: https://eutils.ncbi.nlm.nih.gov/entrez/eutils
+        pubmedTool: dsh-literature-search
+        pubmedEmail: ''
+        pubmedApiKeyEnv: NCBI_API_KEY
+        pubmedApiKey: ''
+        pubmedRateLimitMs: 0
+        # --- Google Scholar (no official API; SerpApi preferred, HTML fallback) ---
+        scholarEnabled: true
+        scholarProvider: auto
+        scholarBaseUrl: https://scholar.google.com
+        scholarSerpApiBaseUrl: https://serpapi.com
+        scholarSerpApiKeyEnv: SERPAPI_API_KEY
+        scholarSerpApiKey: ''
+        scholarHl: en
+        scholarRateLimitMs: 0
+        # --- shared policy ---
+        defaultMaxResults: 10
+        maxResultsCap: 50
+        abstractMaxChars: 600
+        requestTimeoutMs: 30000
+        maxRetries: 3
+        retryBackoffMs: 1000
+        toolTimeoutMs: 120000
+        userAgent: ''
+        promptGuidance: true
+        promptOrder: 155

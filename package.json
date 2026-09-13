@@ -1,0 +1,75 @@
+{
+  "name": "dsh-literature-search",
+  "version": "0.2.1",
+  "description": "Literature search for DeepSeek Harness over the official PubMed NCBI E-utilities API (esearch/esummary/efetch/elink) and Google Scholar (SerpApi engine, or direct HTML parsing because Google publishes no Scholar API). Zero runtime dependencies.",
+  "type": "module",
+  "main": "lib/index.js",
+  "exports": {
+    ".": "./lib/index.js",
+    "./client": "./lib/client.js",
+    "./web": "./lib/web.js",
+    "./pubmed": "./lib/pubmed.js",
+    "./scholar": "./lib/scholar.js",
+    "./medline": "./lib/medline.js",
+    "./paper": "./lib/paper.js",
+    "./http": "./lib/http.js",
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "cordis.patch.yml",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "license": "MIT",
+  "author": "Qin Yifei",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Astervolans/dsh-literature-search.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Astervolans/dsh-literature-search/issues"
+  },
+  "homepage": "https://github.com/Astervolans/dsh-literature-search#readme",
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
+  },
+  "keywords": [
+    "deepseek-harness",
+    "dsh",
+    "plugin",
+    "literature",
+    "pubmed",
+    "eutils",
+    "google-scholar",
+    "serpapi",
+    "paper-search"
+  ],
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "inject": [
+        "slots",
+        "connection"
+      ]
+    }
+  },
+  "scripts": {
+    "setup:dev": "node tools/fetch-dev-deps.mjs",
+    "test": "node test/run-all.mjs",
+    "test:live:pubmed": "node test/live-pubmed.mjs",
+    "test:live:scholar": "node test/live-scholar.mjs",
+    "probe:scholar": "node test/probe-scholar.mjs",
+    "cli": "node cli.mjs"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/cordis": "^4.0.1",
+    "@deepseek-ai/dsh-system-prompt": "^0.1.0-rc.6",
+    "@deepseek-ai/dsh-tools": "^0.1.0-rc.6",
+    "@deepseek-ai/schemastery": "^3.18.1"
+  }
+}
+

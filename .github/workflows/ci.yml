@@ -1,0 +1,74 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# The suite is offline by design: it uses stub fetch and captured fixtures, so
+# it never talks to PubMed or Google Scholar and needs no secrets.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }} / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node: ['22.x', '24.x']
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js ${{ matrix.node }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install the dev-only DSH runtime closure
+        # Pulls @deepseek-ai/dsh-tools and friends from npm and exposes them as
+        # node_modules/. The plugin itself still has zero runtime dependencies.
+        run: node tools/fetch-dev-deps.mjs
+
+      - name: Run the offline test suites
+        run: node test/run-all.mjs
+
+      - name: Smoke-test the CLI wiring
+        run: node cli.mjs --help
+
+  package:
+    name: Package contents
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+
+      - name: Verify the published file list
+        # `files` in package.json must cover the plugin entry point and the
+        # bundle patch, and must not drag node_modules/.dev-deps along.
+        run: |
+          npm pack --dry-run --json > pack.json
+          node -e "
+            const report = require('./pack.json')[0];
+            const files = report.files.map((f) => f.path);
+            const required = ['lib/index.js', 'lib/client.js', 'cordis.patch.yml', 'README.md', 'package.json'];
+            const missing = required.filter((f) => !files.includes(f));
+            const leaked = files.filter((f) => f.startsWith('node_modules/') || f.startsWith('.dev-deps/') || f.startsWith('test/'));
+            if (missing.length) { console.error('missing from the package:', missing); process.exit(1); }
+            if (leaked.length) { console.error('should not be packaged:', leaked); process.exit(1); }
+            console.log('package looks good:', files.length, 'files,', report.size, 'bytes');
+          "

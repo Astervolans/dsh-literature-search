@@ -1,0 +1,18 @@
+{
+  "name": "dsh-literature-search-dev-deps",
+  "private": true,
+  "description": "Dev-only DSH runtime closure for the offline test suite. Installed by tools/fetch-dev-deps.mjs; never shipped with the plugin.",
+  "dependencies": {
+    "@deepseek-ai/cordis": "4.0.2",
+    "@deepseek-ai/dsh-brand": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-llm": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-scope": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-timeout": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-tools": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-typert-protocol": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-util-crypto": "0.1.5-rc.1",
+    "@deepseek-ai/dsh-util-values": "0.1.5-rc.1",
+    "@deepseek-ai/schemastery": "3.18.2",
+    "yaml": "^2.5.0"
+  }
+}
