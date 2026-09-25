@@ -114,6 +114,22 @@ server side exposes `/plugin/literature-search` to back it:
 | `POST /plugin/literature-search/credential` | Writes or clears a key for a `slot` (`pubmed` / `scholar`) |
 | `POST /plugin/literature-search/test` | Actually runs a PubMed esearch and a Scholar search, and reports latency and outcome |
 
+### How the page is provided (DSH 2.x)
+
+DSH 2.x removed `ctx.settings.register`: a plugin **exports its `Config`** and the
+host derives the page from it, keyed by the plugin's profile entry id. Only the
+fields carrying `meta.volatile` are offered, so every field here is marked live
+through a guarded `live()` helper — `.volatile()` needs schemastery ≥ 3.18.4, and
+a profile can hoist an older copy above the installation's one, in which case the
+helper falls back to `.extra('volatile', true)` (same flag, any version).
+
+Live fields arrive in `apply(ctx, config)` as cosmokit volatile references rather
+than plain values, so the runtime re-reads them on every access and drops its
+cached clients when the projection changes. If `GET /config` answers
+`503 settings namespace … is not registered`, the page was not generated: the
+entry is not active, or no field is volatile. The response carries a `hint` with
+exactly that diagnosis.
+
 What the page gives you:
 
 - **Credentials** — the NCBI and SerpApi keys are written through the

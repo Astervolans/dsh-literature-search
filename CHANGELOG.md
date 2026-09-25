@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.5] — 2026-09-25
+
+### Fixed
+
+- **The settings page failed on DSH 2.x with `settings namespace
+  "literature-search" is not registered`.** The plugin called
+  `ctx.settings.register(ns, Config, …)`, a service method DSH 2.x removed. The
+  call threw `TypeError: ctx.settings.register is not a function`, the plugin's
+  own `try/catch` swallowed it, and every `GET /plugin/literature-search/config`
+  then answered `503 settings namespace "literature-search" is not registered`
+  even though the tools themselves kept working.
+
+  A plugin's page is no longer registered by hand: DSH derives it from the
+  exported `Config` schema, and only offers the fields carrying `meta.volatile`.
+  Two things therefore had to change:
+
+  - Every `Config` field is now marked live through a guarded `live()` helper.
+    `.volatile()` exists in schemastery ≥ 3.18.4 only, and a profile can hoist
+    an older copy above the installation's one, so the helper falls back to
+    `.extra('volatile', true)`, which writes the same `meta.volatile` flag on
+    every version. An unguarded `.volatile()` would have replaced one activation
+    failure with another.
+  - The runtime no longer reads a `scope` returned by the settings service. Live
+    values arrive as cosmokit volatile references in the entry config, so every
+    read re-projects them (`plainConfig`/`unwrapField`) and a changed projection
+    drops the cached PubMed/Scholar clients. That keeps the documented
+    "saved keys and provider switches apply immediately" behaviour without any
+    watcher API.
+
+- **The routes looked the page up under a hard-coded namespace.** DSH keys a
+  plugin's page by its profile entry id, so `settingsNs` is now resolved from
+  the owning fiber entry and falls back to `SETTINGS_NS` only when it cannot be
+  read. An entry installed under a different id (or renamed later) no longer
+  breaks the card.
+
+- The `503` body now carries a `hint` explaining the actual contract (the plugin
+  must be active and declare at least one volatile field), because the old
+  message pointed at a namespace that was never going to be registered.
+
+### Added
+
+- Test coverage for the DSH 2.x contract: the exported schema must flag every
+  field volatile, a settings service **without** `register` must still mount the
+  routes and expose the page, the namespace must follow the entry id, and
+  registration-time switches (`enabled`, `scholarEnabled`, …) must never
+  re-register tools on a live write. The settings stand-in now throws if
+  `register` is called at all, so the regression cannot come back silently.
+
 ## [0.2.4] — 2026-09-13
 
 ### Fixed

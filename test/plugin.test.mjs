@@ -76,38 +76,59 @@ function disposer(value) {
 	};
 }
 
-/** Minimal settings service: one registered namespace with a live revision. */
-function fakeSettings() {
-	const registrations = new Map();
+/**
+ * Build the entry config the way a DSH 2.x host hands it to `apply`.
+ *
+ * Every `meta.volatile` field resolves to a cosmokit volatile reference, so the
+ * plugin has to unwrap it on each read for a settings write to be visible
+ * without a restart. `store` stands in for the host's live values and is what
+ * the fake settings service mutates on `update`.
+ * @param {object} values - entry config overrides.
+ * @returns {{ refs: object, store: object }} the reference view and the live store.
+ */
+function volatileConfig(values) {
+	const store = { ...plugin.Config(values) };
+	const refs = {};
+	for (const [key, value] of Object.entries(store)) refs[key] = { get: () => store[key] };
+	return { refs, store };
+}
+
+/**
+ * Minimal DSH 2.x settings service: a page per profile entry id, no `register`.
+ *
+ * The real service derives the page from the plugin's exported `Config` and
+ * reports it under the owning entry's id, so `update` writes straight into the
+ * live store (which is what the host does to the volatile references).
+ * @param {{ ns: string, store: object }} entry - the page this service exposes.
+ */
+function fakeSettings(entry) {
 	const watchers = [];
 	let revision = 0;
 	return {
-		register(ns, schema, options) {
-			if (registrations.has(ns)) throw new Error(`settings namespace "${ns}" is already registered`);
-			const resolved = schema({ ...(options.base ?? {}) });
-			registrations.set(ns, { ns, schema, value: resolved });
-			return {
-				get: () => registrations.get(ns).value,
-				watch(callback) {
-					watchers.push(callback);
-					return () => {};
-				}
-			};
+		/** Present only so a regression that calls it is loud rather than silent. */
+		register() {
+			throw new Error('ctx.settings.register must not be called: DSH 2.x removed it');
 		},
 		describe(options) {
-			return [...registrations.values()].map((registration) => ({
-				ns: registration.ns,
-				revision,
-				value: options?.redactSecrets === true ? { ...registration.value, pubmedApiKey: undefined } : registration.value,
-				base: {},
-				user: {},
-				applies: 'live',
-				secrets: [{ path: ['pubmedApiKey'], set: false }]
-			}));
+			const value = { ...entry.store };
+			if (options?.redactSecrets === true) {
+				value.pubmedApiKey = undefined;
+				value.scholarSerpApiKey = undefined;
+			}
+			return [
+				{
+					ns: entry.ns,
+					revision,
+					value,
+					base: {},
+					user: {},
+					applies: 'live',
+					secrets: [{ path: ['pubmedApiKey'], set: false }]
+				}
+			];
 		},
 		async update(ns, patch, expectedRevision) {
-			const registration = registrations.get(ns);
-			if (registration === undefined) throw new Error(`unknown settings namespace "${ns}"`);
+			if (ns !== entry.ns) throw new Error(`unknown settings namespace "${ns}"`);
 			if (expectedRevision !== undefined && expectedRevision !== revision) {
 				const error = new Error('settings conflict');
 				error.name = 'SettingsConflictError';
@@ -116,13 +137,25 @@ function fakeSettings() {
 				throw error;
 			}
 			revision += 1;
-			const next = { ...registration.value, ...patch };
-			registration.schema(next);
-			registration.value = next;
-			for (const watcher of watchers) watcher(next);
+			Object.assign(entry.store, patch);
+			for (const watcher of watchers) watcher(patch);
 		},
 		revision: () => revision
 	};
+}
+
+/**
+ * Mount one plugin instance against a host-like settings service.
+ * @param {object} [services] - extra services (credentials, webServer, …).
+ * @param {object} [config] - entry config overrides.
+ * @returns {{ ctx: object, settings: object, refs: object, store: object }} the wiring.
+ */
+function mountPlugin(services = {}, config = {}) {
+	const { refs, store } = volatileConfig(config);
+	const settings = fakeSettings({ ns: plugin.SETTINGS_NS, store });
+	const ctx = stubContext({ ...services, settings });
+	plugin.apply(ctx, refs);
+	return { ctx, settings, refs, store };
 }
 
 /** Minimal credentials service that records writes. */
@@ -441,19 +474,38 @@ suite.test('capabilities can be disabled independently', () => {
 	assert.doesNotMatch(ctx.sections[0].text, /Google Scholar tools/);
 });
 
-suite.test('registers the settings namespace and mounts the settings routes', () => {
-	const settings = fakeSettings();
+suite.test('the exported schema marks every field volatile so the host builds a page', () => {
+	// DSH only offers a plugin a settings page when its Config carries at least
+	// one `meta.volatile` field; a schema without them silently has no page at all.
+	const fields = Object.entries(plugin.Config.dict ?? {});
+	assert.equal(fields.length > 0, true, 'the Config schema must declare fields');
+	const plain = fields.filter(([, field]) => field.meta?.volatile !== true).map(([key]) => key);
+	assert.deepEqual(plain, [], `fields missing meta.volatile: ${plain.join(', ')}`);
+});
+
+suite.test('a settings service without register mounts the routes and exposes the page', () => {
 	const credentials = fakeCredentials();
 	const webServer = fakeWebServer();
-	const ctx = stubContext({ settings, credentials, webServer });
-	plugin.apply(ctx, plugin.Config({ pubmedEmail: 'dev@example.com' }));
+	// fakeSettings throws if `register` is called: DSH 2.x removed the method and
+	// an unguarded call aborts the whole plugin activation.
+	const { ctx, settings } = mountPlugin({ credentials, webServer }, { pubmedEmail: 'dev@example.com' });
 	const descriptor = settings.describe({ redactSecrets: true })[0];
 	assert.equal(descriptor.ns, plugin.SETTINGS_NS);
 	assert.equal(descriptor.value.scholarProvider, 'auto');
 	assert.equal(descriptor.value.pubmedEmail, 'dev@example.com');
+	assert.equal(ctx.toolsByName.size, 5);
 	assert.equal(webServer.routes.length, 1);
 	assert.equal(webServer.routes[0].kind, 'prefix');
 	assert.equal(webServer.routes[0].path, plugin.ROUTE_PREFIX);
+});
+
+suite.test('the settings namespace follows the profile entry id', () => {
+	// The host keys the page by the entry id, so a renamed entry must still work.
+	const withFiber = { fiber: { entry: { options: { id: 'lit-search-renamed' } } } };
+	assert.equal(plugin.settingsNamespace(withFiber), 'lit-search-renamed');
+	assert.equal(plugin.settingsNamespace({}), plugin.SETTINGS_NS);
+	assert.equal(plugin.settingsNamespace({ fiber: { entry: { options: {} } } }), plugin.SETTINGS_NS);
+	assert.equal(plugin.settingsNamespace(undefined), plugin.SETTINGS_NS);
 });
 
 suite.test('tools still register when the optional seams are absent', () => {
@@ -463,9 +515,7 @@ suite.test('tools still register when the optional seams are absent', () => {
 });
 
 suite.test('a settings write switches the Scholar backend live', async () => {
-	const settings = fakeSettings();
-	const ctx = stubContext({ settings, credentials: fakeCredentials(), webServer: fakeWebServer() });
-	plugin.apply(ctx, plugin.Config({ scholarProvider: 'auto' }));
+	const { ctx, settings } = mountPlugin({ credentials: fakeCredentials(), webServer: fakeWebServer() }, { scholarProvider: 'auto' });
 	const tool = ctx.toolsByName.get('scholar_search');
 
 	await withStubbedFetch(routes, async (seen) => {
@@ -474,8 +524,8 @@ suite.test('a settings write switches the Scholar backend live', async () => {
 		assert.equal(seen.some((url) => url.includes('serpapi.com')), false);
 	});
 
-	// The settings card's save path: patch the user layer, watchers fire, the
-	// cached client is dropped and the next call resolves the new key.
+	// The settings card's save path: the host mutates the live references, the
+	// changed projection drops the cached client, and the next call uses the key.
 	await settings.update(plugin.SETTINGS_NS, { scholarSerpApiKey: 'live-key' }, settings.revision());
 
 	await withStubbedFetch(routes, async (seen) => {
@@ -488,8 +538,7 @@ suite.test('a settings write switches the Scholar backend live', async () => {
 suite.test('a credential written through the seam is picked up without a restart', async () => {
 	const credentials = fakeCredentials();
 	await credentials.set('SERPAPI_API_KEY', 'stored-key');
-	const ctx = stubContext({ settings: fakeSettings(), credentials, webServer: fakeWebServer() });
-	plugin.apply(ctx, plugin.Config({ scholarProvider: 'auto' }));
+	const { ctx } = mountPlugin({ credentials, webServer: fakeWebServer() }, { scholarProvider: 'auto' });
 	const tool = ctx.toolsByName.get('scholar_search');
 	await withStubbedFetch(routes, async (seen) => {
 		await tool.execute({ query: 'base editing', max_results: 1 }, { signal: undefined });
@@ -500,9 +549,10 @@ suite.test('a credential written through the seam is picked up without a restart
 });
 
 suite.test('a settings write changes the live result limits', async () => {
-	const settings = fakeSettings();
-	const ctx = stubContext({ settings, credentials: fakeCredentials(), webServer: fakeWebServer() });
-	plugin.apply(ctx, plugin.Config({ defaultMaxResults: 10, maxResultsCap: 50, abstractMaxChars: 40 }));
+	const { ctx, settings } = mountPlugin(
+		{ credentials: fakeCredentials(), webServer: fakeWebServer() },
+		{ defaultMaxResults: 10, maxResultsCap: 50, abstractMaxChars: 40 }
+	);
 	const tool = ctx.toolsByName.get('pubmed_search');
 	await settings.update(plugin.SETTINGS_NS, { maxResultsCap: 1, abstractMaxChars: 0 }, settings.revision());
 	await withStubbedFetch(routes, async (seen) => {
@@ -513,6 +563,15 @@ suite.test('a settings write changes the live result limits', async () => {
 		assert.match(esearchUrl, /retmax=1/, 'the live maxResultsCap must bound the ESearch page');
 		assert.equal(value.papers[0].abstract, undefined, 'abstractMaxChars=0 must drop abstracts');
 	});
+});
+
+suite.test('registration-time switches are read once and never re-register live', async () => {
+	// `scholarEnabled` is a restart switch: a live write must not add tools behind
+	// the model's back, because the tool registry is built at apply time.
+	const { ctx, settings } = mountPlugin({ credentials: fakeCredentials(), webServer: fakeWebServer() }, { scholarEnabled: false });
+	assert.deepEqual([...ctx.toolsByName.keys()].sort(), ['pubmed_paper', 'pubmed_related', 'pubmed_search']);
+	await settings.update(plugin.SETTINGS_NS, { scholarEnabled: true }, settings.revision());
+	assert.deepEqual([...ctx.toolsByName.keys()].sort(), ['pubmed_paper', 'pubmed_related', 'pubmed_search']);
 });
 
 if (isMain(import.meta.url)) {
