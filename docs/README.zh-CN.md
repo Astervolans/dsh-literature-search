@@ -1,4 +1,4 @@
-# dsh-literature-search
+# @astervolans/dsh-literature-search
 
 [English](../README.md) · **中文**
 
@@ -10,8 +10,19 @@
 
 [![CI](https://github.com/Astervolans/dsh-literature-search/actions/workflows/ci.yml/badge.svg)](https://github.com/Astervolans/dsh-literature-search/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](../LICENSE)
-[![npm](https://img.shields.io/npm/v/dsh-literature-search.svg)](https://www.npmjs.com/package/dsh-literature-search)
+[![npm](https://img.shields.io/npm/v/@astervolans/dsh-literature-search.svg)](https://www.npmjs.com/package/@astervolans/dsh-literature-search)
+[![GitHub Packages](https://img.shields.io/badge/GitHub%20Packages-%40astervolans%2Fdsh--literature--search-blue.svg)](https://github.com/Astervolans/dsh-literature-search/pkgs/npm/dsh-literature-search)
 [![Runtime dependencies: 0](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen.svg)](../package.json)
+
+> npm 包名是 **scoped** 的：`@astervolans/dsh-literature-search`。GitHub Packages
+> 只接受 scoped 包名，因此两个注册表统一用这个 scoped 名字，安装命令只有一条。
+>
+> 插件的**运行时标识刻意保持无 scope**：导出的 `name`（`literature-search`）、
+> 设置命名空间、`/plugin/literature-search` 路由、客户端模块 id、`dsh.bundle.patch`
+> 行的 `id` 全都没变，已有 profile 的配置不受影响。只有那一行的 `name`（cordis
+> 加载器从 profile 目录导入的模块说明符，而那里只存在 scoped 包）是 scoped 的，
+> 且必须与 `package.json` 的 `name` 保持一致，否则 `dsh web` 启动即报
+> `Cannot find package`。两者不一致时 `test/config.test.mjs` 会直接让构建失败。
 
 DeepSeek Harness（dsh）插件：通过 **PubMed 官方 E-utilities API** 与 **Google Scholar** 检索文献，
 把结果统一成同一种 paper 结构返回给模型。
@@ -42,7 +53,7 @@ DeepSeek Harness（dsh）插件：通过 **PubMed 官方 E-utilities API** 与 *
 ### 从 npm 安装（推荐）
 
 ```bash
-dsh plugin --profile desktop add dsh-literature-search
+dsh plugin --profile desktop add @astervolans/dsh-literature-search
 ```
 
 `dsh plugin` 是在 profile 目录里转发给 pnpm 的薄封装，装完会按**已安装状态**重算 profile 的
@@ -52,8 +63,30 @@ bundle 列表：任何 manifest 里声明了 `dsh.bundle` 的依赖都会自动�
 卸载：
 
 ```bash
-dsh plugin --profile desktop remove dsh-literature-search
+dsh plugin --profile desktop remove @astervolans/dsh-literature-search
 ```
+
+从 0.2.x 升级：包名从无 scope 的 `dsh-literature-search` 改成了 scoped 名，所以先卸载旧的、
+再装新的。配置行的 `id`、设置命名空间和已保存的密钥都不受影响 —— 运行时标识没有变（见文首说明）。
+
+### 从 GitHub Packages 安装
+
+每次发布也会同步到 GitHub Packages（`https://npm.pkg.github.com`）。该注册表**即使对公开包
+也要求认证**，请先准备一个至少有 `read:packages` 权限的 PAT，写进 `.npmrc`（项目级或 `~/.npmrc`）：
+
+```
+@astervolans:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=你的_GITHUB_PAT
+```
+
+```bash
+dsh plugin --profile desktop add @astervolans/dsh-literature-search
+```
+
+注意两点：包在 GitHub 上**默认是 private**（仓库公开也一样），首次发布后需要手动改成 public
+（[包设置](https://github.com/users/Astervolans/packages/npm/dsh-literature-search/settings)
+→ Danger Zone → Change visibility）；安装需要 token，而 npmjs.org 不需要，所以 GitHub
+Packages 更适合当镜像。
 
 ### 从源码安装（离线）
 
@@ -62,8 +95,10 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Profile desktop
 ```
 
 - `-Profile`：目标 profile（桌面应用为 `desktop`，`dsh web` CLI 为 `web`）。
-- 脚本做两件事：把插件复制到 `$DSH_HOME\profiles\<profile>\node_modules\dsh-literature-search`，
+- 脚本做两件事：把插件复制到 `$DSH_HOME\profiles\<profile>\node_modules\@astervolans\dsh-literature-search`，
   并把 `literature-search` 配置行合并进该 profile 的 `cordis.patch.yml`（幂等，可重复执行）。
+  若已有的是 0.3.0 之前的无 scope 行，脚本会就地改写它的模块说明符 —— 加载器正是从 profile
+  目录解析这个字符串的。
 - 安装后**重启 DSH**（桌面应用或 `dsh web`）才会加载新工具。
 - 卸载：`powershell -ExecutionPolicy Bypass -File uninstall.ps1 -Profile desktop`。
 

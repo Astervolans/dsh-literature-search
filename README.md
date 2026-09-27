@@ -1,11 +1,25 @@
-# dsh-literature-search
+# @astervolans/dsh-literature-search
 
 **English** · [中文](docs/README.zh-CN.md)
 
 [![CI](https://github.com/Astervolans/dsh-literature-search/actions/workflows/ci.yml/badge.svg)](https://github.com/Astervolans/dsh-literature-search/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![npm](https://img.shields.io/npm/v/dsh-literature-search.svg)](https://www.npmjs.com/package/dsh-literature-search)
+[![npm](https://img.shields.io/npm/v/@astervolans/dsh-literature-search.svg)](https://www.npmjs.com/package/@astervolans/dsh-literature-search)
+[![GitHub Packages](https://img.shields.io/badge/GitHub%20Packages-%40astervolans%2Fdsh--literature--search-blue.svg)](https://github.com/Astervolans/dsh-literature-search/pkgs/npm/dsh-literature-search)
 [![Runtime dependencies: 0](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen.svg)](package.json)
+
+> The npm package is **scoped**: `@astervolans/dsh-literature-search`. GitHub
+> Packages only accepts scoped names, and the same scoped name is used on
+> npmjs.org so there is one install command for both registries.
+>
+> The plugin's **runtime identity stays unscoped** — the exported `name`
+> (`literature-search`), the settings namespace, the `/plugin/literature-search`
+> routes, the client module id and the `dsh.bundle.patch` row `id` are all
+> unchanged, so an existing profile keeps its configuration. Only the row's
+> `name` (the module specifier the cordis loader imports from the profile
+> directory, where only the scoped package exists) is scoped, and it must stay in
+> sync with `package.json` or `dsh web` aborts at startup with
+> `Cannot find package`. `test/config.test.mjs` fails the build if they drift.
 
 A DeepSeek Harness (dsh) plugin that searches the literature through the
 **official PubMed NCBI E-utilities API** and **Google Scholar**, and returns
@@ -47,7 +61,7 @@ All tool names are distinct from the existing `dsh-ai4scholar` plugin
 ### From npm (recommended)
 
 ```bash
-dsh plugin --profile desktop add dsh-literature-search
+dsh plugin --profile desktop add @astervolans/dsh-literature-search
 ```
 
 `dsh plugin` forwards to pnpm inside the profile directory and then reconciles
@@ -58,8 +72,35 @@ if you run the `dsh web` CLI. Restart DSH afterwards so the new tools load.
 Remove it with:
 
 ```bash
-dsh plugin --profile desktop remove dsh-literature-search
+dsh plugin --profile desktop remove @astervolans/dsh-literature-search
 ```
+
+Upgrading from 0.2.x? The package was renamed from the unscoped
+`dsh-literature-search`, so remove the old one and add the scoped one. The plugin
+row `id`, the settings namespace and your saved keys are unaffected — the runtime
+identity did not change (see the note at the top).
+
+### From GitHub Packages
+
+Each release also publishes to GitHub Packages
+(`https://npm.pkg.github.com`). That registry requires authentication **even for
+public packages**, so add a `.npmrc` — project-level, or `~/.npmrc` — with a
+personal access token that has at least `read:packages`:
+
+```
+@astervolans:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=YOUR_GITHUB_PAT
+```
+
+```bash
+dsh plugin --profile desktop add @astervolans/dsh-literature-search
+```
+
+Two things to know before choosing this route: the package is **private by
+default** on GitHub even though the repository is public (flip it once at
+[package settings](https://github.com/users/Astervolans/packages/npm/dsh-literature-search/settings)
+→ Danger Zone → Change visibility), and installation needs a token. npmjs.org
+needs neither, so GitHub Packages is a mirror rather than the friendlier path.
 
 ### From a source checkout (offline)
 
@@ -70,9 +111,11 @@ powershell -ExecutionPolicy Bypass -File install.ps1 -Profile desktop
 - `-Profile` is the target profile (`desktop` for the desktop app, `web` for
   the `dsh web` CLI).
 - The script does two things: it copies the plugin into
-  `$DSH_HOME\profiles\<profile>\node_modules\dsh-literature-search`, and it
-  merges the `literature-search` config row into that profile's
-  `cordis.patch.yml` (idempotent — safe to re-run).
+  `$DSH_HOME\profiles\<profile>\node_modules\@astervolans\dsh-literature-search`,
+  and it merges the `literature-search` config row into that profile's
+  `cordis.patch.yml` (idempotent — safe to re-run). If the managed row is still
+  the pre-0.3.0 unscoped one, the script rewrites its module specifier in place,
+  because the loader resolves that string from the profile directory.
 - Restart DSH (desktop app or `dsh web`) to load the new tools.
 - To remove it:
   `powershell -ExecutionPolicy Bypass -File uninstall.ps1 -Profile desktop`.

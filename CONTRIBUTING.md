@@ -109,19 +109,44 @@ A blocked, throttled or unreachable upstream is reported as `SKIP`. Only
 
 ## Releasing
 
-The plugin is published to npm as `dsh-literature-search`. Publishing is what
-makes the 1024 Store list an install command for it — the store detects a
-published manifest that declares `dsh.bundle`, so no catalog change is needed
-after the first release.
+The plugin is published under the scoped npm name
+**`@astervolans/dsh-literature-search`** — scoped because GitHub Packages only
+accepts scoped names, and the same name is used on npmjs.org so both registries
+share one install command. Publishing is what makes the 1024 Store list an
+install command for it — the store detects a published manifest that declares
+`dsh.bundle`, so no catalog change is needed after the first release.
 
 1. Update `CHANGELOG.md` and bump `version` in `package.json`.
 2. Confirm the package contents: `npm pack --dry-run`. `package.json` and
    `cordis.patch.yml` **must** both be in the tarball — the latter is the
    `dsh.bundle.patch` the harness loads.
-3. `npm publish`. `prepublishOnly` runs the offline suite first and aborts the
-   publish if anything fails.
-4. Tag and push: `git tag -a vX.Y.Z -m "..."` then `git push origin main --tags`.
-5. Create the GitHub release from the same changelog section.
+3. Tag and push: `git tag -a vX.Y.Z -m "..."` then `git push origin main --tags`.
+4. Create the GitHub release from the same changelog section. **That is the
+   publish trigger**: `.github/workflows/release-package.yml` builds, runs the
+   suite, and publishes to GitHub Packages with the workflow's own
+   `GITHUB_TOKEN` — no secret, no token rotation, and re-running the job for an
+   already-published version is a no-op.
+5. Publish to npmjs.org by hand:
+
+   ```bash
+   npm publish        # publishConfig.access=public is already declared
+   ```
+
+   To automate this too, configure a trusted publisher at
+   <https://www.npmjs.com/package/@astervolans/dsh-literature-search> → Settings →
+   Trusted Publisher (repository `Astervolans/dsh-literature-search`, workflow
+   `release-package.yml`) and set the repository variable
+   `NPMJS_TRUSTED_PUBLISHING=true`; the opt-in `publish-npmjs` job then runs on
+   every release.
+
+### The invariant the rename introduced
+
+`cordis.patch.yml`'s row `name` must equal `package.json`'s `name`, because the
+cordis loader imports exactly that string from the profile directory, where only
+the scoped package exists. `test/config.test.mjs` asserts the equality and also
+checks `install.ps1`'s embedded row against `cordis.patch.yml`, so a divergence
+fails CI instead of surfacing as a `Cannot find package` abort inside someone
+else's profile.
 
 Note that npm does not allow republishing a version, so a mistake means
 publishing the next patch rather than overwriting.

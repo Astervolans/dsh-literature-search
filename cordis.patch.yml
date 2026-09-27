@@ -2,9 +2,18 @@
 # The row id `literature-search` is unique; the same block can be applied as a
 # profile bundle (`dsh plugin add`) or merged into the profile's own
 # cordis.patch.yml (see install.ps1, which appends this row).
+#
+# `name` MUST be the package's resolvable module specifier: the cordis loader
+# imports exactly this string from the profile directory, where only the scoped
+# package exists, so an unscoped name here makes `dsh web` abort at startup with
+# `Cannot find package 'dsh-literature-search' imported from <profile>`.
+# It is quoted because a leading `@` is a YAML reserved indicator.
+# The npm name is scoped, but `id` stays the unscoped runtime id, so the
+# `literature-search` settings namespace, the `/plugin/literature-search` route
+# tree and the client module id are all unchanged by the rename.
 - insert:
     - id: literature-search
-      name: dsh-literature-search
+      name: "@astervolans/dsh-literature-search"
       config:
         enabled: true
         # --- PubMed (official NCBI E-utilities; free, no key required) ---

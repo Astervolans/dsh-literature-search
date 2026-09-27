@@ -1,0 +1,168 @@
+name: Node.js Package
+
+# Publishes to GitHub Packages, following the GitHub Packages quickstart: a
+# `build` job gates a `publish-gpr` job on `release: created`.
+#
+# Two deliberate additions to the quickstart:
+#   * `workflow_dispatch`, so the pipeline can be exercised by hand instead of
+#     cutting a throwaway release — the publish step is idempotent, so a re-run
+#     of an already-published version is a no-op rather than a red run;
+#   * an opt-in npmjs.org job, because this package ships to the public npm
+#     registry under the same scoped name and that half needs a one-time
+#     npm-side trusted-publisher setup.
+#
+# The package has zero runtime dependencies and no `package-lock.json`, so the
+# quickstart's `npm ci` is replaced by this repository's own dev-deps bootstrap
+# (the same one `.github/workflows/ci.yml` uses).
+
+on:
+  release:
+    types: [created]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-package-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+
+      - name: Release tag must match package.json
+        # A tag/version mismatch would publish a version nobody asked for, and
+        # npm refuses to overwrite one, so fail before anything is uploaded.
+        if: github.event_name == 'release'
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::release tag v$TAG does not match package.json version $PKG"
+            exit 1
+          fi
+          echo "Releasing $PKG"
+
+      - name: Install the dev-only DSH runtime closure
+        # Pulls @deepseek-ai/dsh-tools and friends from npm and exposes them as
+        # node_modules/. The plugin itself still has zero runtime dependencies.
+        run: node tools/fetch-dev-deps.mjs
+
+      - name: Run the offline test suites
+        run: node test/run-all.mjs
+
+  publish-gpr:
+    name: Publish to GitHub Packages
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Required to publish a package associated with this repository.
+      packages: write
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js and authenticate the @astervolans scope
+        # Pointing `registry-url` at GitHub Packages makes setup-node write
+        #
+        #   @astervolans:registry=https://npm.pkg.github.com/
+        #   //npm.pkg.github.com/:_authToken=${NODE_AUTH_TOKEN}
+        #
+        # into $RUNNER_TEMP/.npmrc and export NPM_CONFIG_USERCONFIG for the
+        # following steps. The scope is inferred from the repository owner and
+        # lowercased, so no `scope` input is needed here.
+        #
+        # Only the scope is remapped: the default registry stays npmjs.org,
+        # which is what keeps the dev-deps install below working. A committed
+        # routing `.npmrc` is deliberately avoided, because it would also send
+        # `npm publish` to GitHub Packages when publishing this same scope to
+        # npmjs.org from a local clone.
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          registry-url: https://npm.pkg.github.com/
+
+      - name: Install the dev-only DSH runtime closure
+        # `prepublishOnly` runs the offline suite during `npm publish`, and that
+        # suite needs the DSH runtime closure. It resolves from npmjs.org, which
+        # is still the default registry (see the step above).
+        run: node tools/fetch-dev-deps.mjs
+
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          PKG="$(node -p "require('./package.json').name")"
+          VER="$(node -p "require('./package.json').version")"
+
+          # GitHub Packages requires auth even to read, so the lookup below runs
+          # with the same token. Distinguish "not published yet" (404 -> go on)
+          # from a real registry problem (anything else -> fail loudly).
+          if LOOKUP="$(npm view "$PKG@$VER" version 2>&1)"; then
+            echo "::notice::$PKG@$VER is already on GitHub Packages - nothing to publish."
+            exit 0
+          fi
+          case "$LOOKUP" in
+            *E404*|*404*|*"Not Found"*) ;;
+            *) echo "$LOOKUP" >&2; exit 1 ;;
+          esac
+
+          npm publish
+          echo "::notice::published $PKG@$VER to GitHub Packages"
+          echo "https://github.com/Astervolans/dsh-literature-search/pkgs/npm/dsh-literature-search"
+
+  publish-npmjs:
+    name: Publish to npmjs.org
+    needs: build
+    # Opt-in, skipped by default so a release never goes red over an npm-side
+    # setting this workflow cannot configure itself.
+    #
+    # To enable: configure a trusted publisher at
+    #   https://www.npmjs.com/package/@astervolans/dsh-literature-search
+    #   -> Settings -> Trusted Publisher
+    # with "GitHub Actions" and
+    #   Organization or user: Astervolans
+    #   Repository:           dsh-literature-search
+    #   Workflow filename:    release-package.yml
+    # then set the repository variable NPMJS_TRUSTED_PUBLISHING=true
+    # (Settings -> Secrets and variables -> Actions -> Variables).
+    if: vars.NPMJS_TRUSTED_PUBLISHING == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # OIDC: lets npm verify that this exact workflow is allowed to publish, so
+      # no long-lived token (and no token rotation) is involved.
+      id-token: write
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        # Trusted publishing needs npm >= 11.5.1; Node 24 ships it. Node 20 does
+        # not, and fails with "Access token expired or revoked".
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+          registry-url: https://registry.npmjs.org
+
+      - name: Install the dev-only DSH runtime closure
+        run: node tools/fetch-dev-deps.mjs
+
+      - name: Publish
+        # No NODE_AUTH_TOKEN on purpose: npm exchanges the OIDC id-token for
+        # short-lived credentials and attaches a provenance attestation.
+        # `access: public` comes from `publishConfig` in package.json.
+        run: npm publish --provenance

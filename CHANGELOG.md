@@ -7,6 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-27
+
+### Changed
+
+- **BREAKING: the npm package is renamed `dsh-literature-search` →
+  `@astervolans/dsh-literature-search`.** GitHub Packages only accepts scoped npm
+  packages, so the unscoped name can never be published there. The scoped name is
+  used on npmjs.org as well, which keeps a single install command for both
+  registries.
+
+  The plugin's **runtime identity is deliberately unchanged**: the exported `name`
+  (`literature-search`), the settings namespace, the `/plugin/literature-search`
+  route tree, the client module id, the `pubmedTool` value sent to NCBI and the
+  diagnostics directory (`$DSH_HOME/.dsh-literature-search`) all stay unscoped, so
+  an existing profile keeps its configuration and its saved keys.
+
+  Two things had to move with the name, because the cordis loader resolves them:
+  the `dsh.bundle.patch` row's `name` in `cordis.patch.yml` (the module specifier
+  imported from the profile directory, where only the scoped package exists) and
+  the copy target in `install.ps1`/`uninstall.ps1`
+  (`node_modules\@astervolans\dsh-literature-search`). `install.ps1` rewrites a
+  pre-0.3.0 unscoped row in place, and `uninstall.ps1` also removes a pre-0.3.0
+  copy. `test/config.test.mjs` already asserts `row.name === package.json.name`,
+  so the pair cannot silently diverge again.
+
+### Added
+
+- **GitHub Packages publishing.** `.github/workflows/release-package.yml` runs on
+  `release: created` (plus `workflow_dispatch`) and publishes to
+  `https://npm.pkg.github.com` with the workflow's own `GITHUB_TOKEN` — no secret
+  and no token rotation. Re-running an already-published version is a no-op. An
+  opt-in `publish-npmjs` job (repository variable `NPMJS_TRUSTED_PUBLISHING=true`)
+  publishes to npmjs.org through trusted publishing.
+- `publishConfig.access: public`, required for a scoped package on npmjs.org.
+
+### Fixed
+
+- **`npm pack --json` shape drift in the CI packaging gate.** npm ≤ 11 emits an
+  array while npm ≥ 12 emits an object keyed by package name, so the `package`
+  job's `require('./pack.json')[0]` would have thrown a `TypeError` on a runner
+  with a newer npm. Both the `package` job and the new release workflow now accept
+  either shape.
+
 ## [0.2.5] — 2026-09-25
 
 ### Fixed
@@ -178,7 +221,8 @@ inside a DSH workspace and are folded into this version.
   reports HTTP 429 / anti-bot pages as explicit errors rather than silently
   returning empty results.
 
-[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.0
 [0.2.4]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.4
 [0.2.3]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.3
 [0.2.2]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.2

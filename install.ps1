@@ -2,6 +2,12 @@
 # Copies the plugin into a DSH profile's node_modules and merges the managed
 # config row into that profile's cordis.patch.yml (idempotent).
 #
+# The package is published under the scoped npm name
+# `@astervolans/dsh-literature-search`, so it lands in the profile at
+# node_modules\@astervolans\dsh-literature-search — that is the layout pnpm
+# produces for `dsh plugin --profile <p> add @astervolans/dsh-literature-search`,
+# and the path the managed row's `name` must resolve from.
+#
 # The plugin has zero runtime dependencies: it uses the global fetch/AbortSignal
 # APIs and resolves @deepseek-ai/* peers from $DshHome\profiles\node_modules,
 # which DSH already provides. No npm install and no network access are needed.
@@ -17,7 +23,7 @@ $ErrorActionPreference = "Stop"
 
 $PluginRoot = Split-Path -Parent $MyInvocation.MyCommand.Path
 $ProfileDir = Join-Path $DshHome "profiles\$Profile"
-$Target = Join-Path $ProfileDir "node_modules\dsh-literature-search"
+$Target = Join-Path $ProfileDir "node_modules\@astervolans\dsh-literature-search"
 $PatchFile = Join-Path $ProfileDir "cordis.patch.yml"
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 
@@ -31,6 +37,7 @@ if (-not (Test-Path $ProfileDir)) {
 #    runtime dependencies (DSH resolves @deepseek-ai/* from its own runtime),
 #    and the dev-only junctions the test suite needs must never be copied into
 #    the profile. /XJ keeps robocopy off junctions.
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $Target) | Out-Null
 Write-Host "==> copying plugin to $Target"
 robocopy $PluginRoot $Target /E /XD .git node_modules .dev-deps /XJ /NFL /NDL /NJH /NJS /NP | Out-Null
 if ($LASTEXITCODE -ge 8) { throw "robocopy failed (exit $LASTEXITCODE)" }
@@ -38,14 +45,28 @@ if ($LASTEXITCODE -ge 8) { throw "robocopy failed (exit $LASTEXITCODE)" }
 # 2. merge the bundle row into the profile patch layer (idempotent)
 $PatchContent = [System.IO.File]::ReadAllText($PatchFile)
 if ($PatchContent -match "# ---- dsh-literature-search \(managed by") {
-    Write-Host "==> cordis.patch.yml already carries the managed literature-search row; leaving it untouched"
+    # The row is already managed. Before 0.3.0 it pinned the *unscoped* module
+    # specifier, which the cordis loader resolves from the profile directory
+    # where only the scoped package now exists — leaving it would make
+    # `dsh web` abort at startup with `Cannot find package`. Rewrite just that
+    # value; the row id, the settings namespace and the config stay untouched.
+    $upgraded = [System.Text.RegularExpressions.Regex]::Replace(
+        $PatchContent,
+        '(?m)^([ \t]*name:[ \t]*)dsh-literature-search[ \t]*$',
+        '$1"@astervolans/dsh-literature-search"')
+    if ($upgraded -ne $PatchContent) {
+        [System.IO.File]::WriteAllText($PatchFile, $upgraded, $Utf8NoBom)
+        Write-Host "==> rewrote the managed row's module specifier to @astervolans/dsh-literature-search"
+    } else {
+        Write-Host "==> cordis.patch.yml already carries the managed literature-search row; leaving it untouched"
+    }
 } else {
     $block = @"
 
 # ---- dsh-literature-search (managed by plugins\dsh-literature-search\install.ps1) ----
 - insert:
     - id: literature-search
-      name: dsh-literature-search
+      name: "@astervolans/dsh-literature-search"
       config:
         enabled: true
         pubmedEnabled: true

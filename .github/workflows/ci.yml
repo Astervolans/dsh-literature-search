@@ -63,7 +63,11 @@ jobs:
         run: |
           npm pack --dry-run --json > pack.json
           node -e "
-            const report = require('./pack.json')[0];
+            // npm <= 11 emits an array; npm >= 12 emits an object keyed by
+            // package name. Accept both so a runner npm upgrade cannot turn
+            // this gate into a TypeError.
+            const data = require('./pack.json');
+            const report = Array.isArray(data) ? data[0] : Object.values(data)[0];
             const files = report.files.map((f) => f.path);
             const required = ['lib/index.js', 'lib/client.js', 'cordis.patch.yml', 'README.md', 'package.json'];
             const missing = required.filter((f) => !files.includes(f));
