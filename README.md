@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/Astervolans/dsh-literature-search/actions/workflows/ci.yml/badge.svg)](https://github.com/Astervolans/dsh-literature-search/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![npm](https://img.shields.io/npm/v/@astervolans/dsh-literature-search.svg)](https://www.npmjs.com/package/@astervolans/dsh-literature-search)
+[![npm](https://img.shields.io/npm/v/@astervolans/dsh-literature-search.svg)](https://www.npmjs.com/package/@astervolans/@astervolans/dsh-literature-search)
 [![GitHub Packages](https://img.shields.io/badge/GitHub%20Packages-%40astervolans%2Fdsh--literature--search-blue.svg)](https://github.com/Astervolans/dsh-literature-search/pkgs/npm/dsh-literature-search)
 [![Runtime dependencies: 0](https://img.shields.io/badge/runtime%20dependencies-0-brightgreen.svg)](package.json)
 
