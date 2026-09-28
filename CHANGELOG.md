@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.2] — 2026-09-28
+
 ### Fixed
 
 - **A cleared key slot still read as "已配置（保存在设置中）".** `collectSlot`
@@ -298,7 +300,8 @@ inside a DSH workspace and are folded into this version.
   reports HTTP 429 / anti-bot pages as explicit errors rather than silently
   returning empty results.
 
-[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.3.1...HEAD
+[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.3.2...HEAD
+[0.3.2]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.2
 [0.3.1]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.0
 [0.2.4]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.4
