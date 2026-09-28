@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A cleared key slot still read as "已配置（保存在设置中）".** `collectSlot`
+  treated the settings descriptor's secret metadata (`secrets[].set`) as proof of
+  a stored key, but the host reports `set: true` for any `role('secret')` field
+  merely *present* in the projected value — and this namespace declares
+  `pubmedApiKey` / `scholarSerpApiKey` as `default('')`, so the flag was already
+  true before a key was ever entered and stayed true after a clear. A non-empty
+  inline value — what `resolveSecret` actually reads — now decides the
+  `settings-inline` state; the flag stays in `facts` for the diagnostic line,
+  which prints `settings-secret=set` or `settings-secret=declared/empty`.
+
+- **Clearing a slot left an inline key live.** `POST /credential` skipped the
+  inline-field cleanup whenever `clear: true`, so a value in `pubmedApiKey` /
+  `scholarSerpApiKey` — which outranks the credential store in `resolveSecret` —
+  survived the clear while the card reported the slot as cleared. A clear now
+  empties both layers.
+
+### Added
+
+- **Regression tests** in `test/web.test.mjs`: a declared-but-empty secret slot
+  is not configured, a genuinely set inline key still reports the
+  `settings-inline` state, and a clear with an inline key present writes it away.
+
 ## [0.3.1] — 2026-09-28
 
 ### Fixed

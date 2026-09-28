@@ -145,16 +145,23 @@ node cli.mjs scholar "base editing" --max 5          # 无 key 时走 HTML，时
 
 ### 密钥存放与状态判定
 
-每个密钥槽用**两条独立探针**判断状态，并在徽章下方打印一行非敏感诊断
-（`ref=` / `describe=` / `resolve=` / `error=`）：
+每个密钥槽用**多条独立探针**判断状态，并在徽章下方打印一行非敏感诊断
+（`ref=` / `describe=` / `resolve=` / `settings-secret=` / `error=`）：
 
 1. **凭据服务**（`ctx.credentials`，写 `$DSH_HOME/.credentials.yaml`）——首选；
 2. **设置内的密钥字段**（`pubmedApiKey` / `scholarSerpApiKey`，标了 `role('secret')`，读取时脱敏）——
    当前组合**没有**凭据服务时自动降级到这里；`resolveSecret` 也优先读取它。
 
 所以不论组合里有没有凭据服务，密钥都会落到一个**插件确实会读到**的位置。
-若两条探针结论不一致（例如 `describe` 说未配置、`resolve` 却能取到值），页面按「已配置」显示，
+若凭据探针结论不一致（例如 `describe` 说未配置、`resolve` 却能取到值），页面按「已配置」显示，
 同时把两条原始结论留在诊断行里。
+
+宿主的 `describe({ redactSecrets: true })` 对 `role('secret')` 字段报的 `set: true`，
+只表示「该键**存在于投影值中**」，而本命名空间声明了 `default('')`，**空密钥同样报 set**。
+因此这个标志只作为诊断信息打印（`settings-secret=set` / `settings-secret=declared/empty`），
+**不再单独决定徽章**——只有非空的内联值才算已配置，那也正是 `resolveSecret` 读取的东西；
+否则点过「清除」的槽位会永久显示「已配置（保存在设置中）」。
+「清除」会同时清空两层：凭据库**与**内联字段（内联字段优先级更高）。
 
 服务端还会把**不含密钥值**的判定结果写到：
 

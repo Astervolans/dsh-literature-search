@@ -208,9 +208,9 @@ client runtime). **There is no build step.**
 
 ### How keys are stored, and how their state is decided
 
-Each key slot is judged by **two independent probes**, and a non-sensitive
-diagnostic line (`ref=` / `describe=` / `resolve=` / `error=`) is printed
-under the badge:
+Each key slot is judged by **independent probes**, and a non-sensitive
+diagnostic line (`ref=` / `describe=` / `resolve=` / `settings-secret=` /
+`error=`) is printed under the badge:
 
 1. **The credential service** (`ctx.credentials`, writing
    `$DSH_HOME/.credentials.yaml`) — preferred;
@@ -220,9 +220,19 @@ under the badge:
    it too.
 
 So whether or not a credential service is present, a key lands somewhere the
-plugin genuinely reads. If the two probes disagree — `describe` says
+plugin genuinely reads. If the credential probes disagree — `describe` says
 unconfigured while `resolve` returns a value — the page shows "configured" and
 keeps both raw conclusions in the diagnostic line.
+
+The host's `describe({ redactSecrets: true })` reports `secrets[].set: true` for
+a `role('secret')` field whenever it is merely *present* in the projected value,
+and this namespace declares `default('')` — so an empty key reads as "set" too.
+That flag is therefore printed for diagnosis (`settings-secret=set` /
+`settings-secret=declared/empty`) but never decides the badge on its own; only a
+non-empty inline value counts, which is what `resolveSecret` reads. Treating it
+as configured is what used to leave a cleared slot claiming
+已配置（保存在设置中）— "configured, saved in settings". Clearing a slot empties
+both layers: the credential store *and* the inline field, which outranks it.
 
 The server also writes the verdict, **without any key values**, to:
 

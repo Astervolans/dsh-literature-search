@@ -233,6 +233,27 @@ suite.test('POST /credential writes and clears the configured refs only', async 
 	assert.equal(credentials.calls.length, 2);
 });
 
+suite.test('clear also empties an inline key that outranks the store', async () => {
+	const settings = fakeSettings();
+	const credentials = fakeCredentials();
+	const runtime = fakeRuntime();
+	// `runtime.config()` is the seam resolveSecret reads; an inline key living
+	// there wins over the credential store, so a clear that skipped it left the
+	// slot genuinely live while the card reported it as cleared.
+	const live = { ...runtime.config(), scholarSerpApiKey: 'inline-key' };
+	runtime.config = () => live;
+	await credentials.set('SERPAPI_API_KEY', 'stored');
+
+	const result = await call(
+		{ services: () => ({ settings, credentials }), runtime, defaults: {}, version: '0.1.0' },
+		{ method: 'POST', url: '/credential', body: JSON.stringify({ slot: 'scholar', clear: true }) }
+	);
+	assert.equal(result.status, 200);
+	assert.equal(result.json.mode, 'credentials');
+	assert.deepEqual(credentials.calls[credentials.calls.length - 1], { op: 'unset', ref: 'SERPAPI_API_KEY' });
+	assert.deepEqual(settings.updates[settings.updates.length - 1].patch, { scholarSerpApiKey: '' });
+});
+
 suite.test('POST /test probes both backends and reports failures with a hint', async () => {
 	const ok = await call(
 		{ services: () => ({ settings: fakeSettings(), credentials: fakeCredentials() }), runtime: fakeRuntime(), defaults: {}, version: '0.1.0' },
@@ -375,6 +396,30 @@ suite.test('collectFacts works without a credentials service', async () => {
 	assert.equal(facts.credentials[0].configured, false);
 	assert.equal(facts.credentials[0].ref, 'NCBI_API_KEY');
 	assert.equal(facts.credentials[0].describeRaw, null);
+});
+
+suite.test('collectFacts does not read a declared-but-empty secret slot as configured', async () => {
+	// The host reports `set: true` for any field present in the projected value,
+	// and this namespace declares `default('')` — so an empty key reads as "set".
+	// The badge must not claim "已配置（保存在设置中）" for a cleared slot.
+	const facts = await collectFacts(
+		{ pubmedApiKeyEnv: 'NCBI_API_KEY', scholarSerpApiKeyEnv: 'SERPAPI_API_KEY', pubmedApiKey: '', scholarSerpApiKey: '' },
+		{ settingSecrets: [{ path: ['pubmedApiKey'], set: true }, { path: ['scholarSerpApiKey'], set: true }] }
+	);
+	assert.equal(facts.credentials[0].settingSecretSet, true);
+	assert.equal(facts.credentials[0].inlineConfigured, false);
+	assert.equal(facts.credentials[0].configured, false);
+	assert.equal(facts.credentials[0].source, null);
+	assert.equal(facts.credentials[1].configured, false);
+});
+
+suite.test('collectFacts still reports a genuinely set inline key', async () => {
+	const facts = await collectFacts(
+		{ pubmedApiKeyEnv: 'NCBI_API_KEY', scholarSerpApiKeyEnv: 'SERPAPI_API_KEY', pubmedApiKey: 'inline-key' },
+		{ settingSecrets: [{ path: ['pubmedApiKey'], set: true }] }
+	);
+	assert.equal(facts.credentials[0].configured, true);
+	assert.equal(facts.credentials[0].source, 'settings-inline');
 });
 
 suite.test('POST /credential falls back to the settings secret without a credentials service', async () => {
