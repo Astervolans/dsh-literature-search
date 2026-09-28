@@ -17,12 +17,18 @@
 > npm 包名是 **scoped** 的：`@astervolans/dsh-literature-search`。GitHub Packages
 > 只接受 scoped 包名，因此两个注册表统一用这个 scoped 名字，安装命令只有一条。
 >
-> 插件的**运行时标识刻意保持无 scope**：导出的 `name`（`literature-search`）、
-> 设置命名空间、`/plugin/literature-search` 路由、客户端模块 id、`dsh.bundle.patch`
-> 行的 `id` 全都没变，已有 profile 的配置不受影响。只有那一行的 `name`（cordis
-> 加载器从 profile 目录导入的模块说明符，而那里只存在 scoped 包）是 scoped 的，
-> 且必须与 `package.json` 的 `name` 保持一致，否则 `dsh web` 启动即报
-> `Cannot find package`。两者不一致时 `test/config.test.mjs` 会直接让构建失败。
+> 插件的**运行时标识大部分保持无 scope**：导出的 `name`（`literature-search`）、
+> 设置命名空间、`/plugin/literature-search` 路由、`dsh.bundle.patch` 行的 `id`
+> 全都没变，已有 profile 的配置不受影响。只有两个标识必须是 scoped 包名，因为
+> DSH 都从 profile 目录解析它们，而那里只存在 scoped 包：
+>
+> 1. patch 行的 `name` —— cordis 加载器导入的模块说明符；与 `package.json` 的
+>    `name` 不一致时 `dsh web` 启动即报 `Cannot find package`，`test/config.test.mjs`
+>    会让构建失败。
+> 2. `lib/client.js` 里客户端 bundle 的注册 id —— DSH 客户端加载器按「行解析出的
+>    包名」给启动图行建索引，注册成别的 id 时该行拿不到工厂、加载器重试同一
+>    bundle，页面随即以 `duplicate factory registration` 中止（这正是 0.3.0 的启动
+>    故障，0.3.1 修复）；`test/client.test.mjs` 会让构建失败。
 
 DeepSeek Harness（dsh）插件：通过 **PubMed 官方 E-utilities API** 与 **Google Scholar** 检索文献，
 把结果统一成同一种 paper 结构返回给模型。
@@ -68,6 +74,8 @@ dsh plugin --profile desktop remove @astervolans/dsh-literature-search
 
 从 0.2.x 升级：包名从无 scope 的 `dsh-literature-search` 改成了 scoped 名，所以先卸载旧的、
 再装新的。配置行的 `id`、设置命名空间和已保存的密钥都不受影响 —— 运行时标识没有变（见文首说明）。
+若你装的是 **0.3.0**，请在重启 DSH 前先升级到 0.3.1：0.3.0 的客户端 bundle 仍然注册改名前的
+id，设置卡片加载失败，桌面端因此自动禁用了该 bundle。
 
 ### 从 GitHub Packages 安装
 
@@ -253,13 +261,15 @@ node test/probe-scholar.mjs    # 连通性诊断：status / 结果块数 / 是�
 - `tools/fetch-dev-deps.mjs` 走另一条路：按 `.dev-deps/package.json` 里钉住的版本
   从 npm 装同一批包，再软链到 `node_modules/`。适合没装 DSH Desktop 的机器和 CI
   （`.github/workflows/ci.yml` 在 Ubuntu + Windows × Node 22/24 上跑全部离线用例）。
-- 离线共 **62 个用例**：MEDLINE 解析 7、Scholar 解析/分页 6、插件与工具 21（含
+- 离线共 **66 个用例**：MEDLINE 解析 7、Scholar 解析/分页 6、插件与工具 24（含
   「settings 写入后 Scholar 即时切换后端」「凭据写入后无需重启生效」「实时条数上限」）、
-  设置路由 14、客户端 bundle 10、配置漂移 4。全部用桩 `fetch`/假服务，不联网。
+  设置路由 14、客户端 bundle 11、配置漂移 4。全部用桩 `fetch`/假服务，不联网。
 - 客户端 bundle 套件用桩 `window.__ModuleLoader__` + 极简 React shim 真正执行并遍历渲染树，
   能在没有浏览器的情况下抓出设置页里的拼写错误与空引用（已借此修掉一个 `state.drafts` 空值崩溃）。
   0.2.2 起它会展开函数组件做深度渲染，因此子组件拥有的节点（如密钥字段的按钮）也能断言，
   并直接守住主题回归：主按钮必须用成对的 token、不得把 `--dsw-alias-brand-primary` 当填充色。
+  0.3.1 起它还钉住把 0.3.0 打挂的注册契约：bundle 必须**只**以 `package.json#name` 注册一次工厂，
+  而同一 bundle 的第二次执行必须是那条 duplicate-registration 崩溃，不能被当成静默重试。
 - 在线测试把**上游不可用**（无出网 / DNS / 超时 / HTTP 429 / 反爬页）记为 SKIP 而不是 FAIL，
   因为那是环境或对方策略问题；只有“页面里有结果块但解析出 0 条”才判失败。
   实测：Google Scholar HTML 5/5 通过；PubMed 在本机出网时好时坏，不通时会明确打印 SKIP 与原因。

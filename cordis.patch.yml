@@ -8,9 +8,12 @@
 # package exists, so an unscoped name here makes `dsh web` abort at startup with
 # `Cannot find package 'dsh-literature-search' imported from <profile>`.
 # It is quoted because a leading `@` is a YAML reserved indicator.
-# The npm name is scoped, but `id` stays the unscoped runtime id, so the
-# `literature-search` settings namespace, the `/plugin/literature-search` route
-# tree and the client module id are all unchanged by the rename.
+# `name` is also the client-module identity: @deepseek-ai/dsh-client-modules keys
+# the boot-graph row by the package name this specifier resolves to, so
+# `lib/client.js` must call `window.__ModuleLoader__.load` with the same scoped
+# string. `id` stays the unscoped runtime id, so the `literature-search` settings
+# namespace and the `/plugin/literature-search` route tree are unchanged by the
+# rename.
 - insert:
     - id: literature-search
       name: "@astervolans/dsh-literature-search"

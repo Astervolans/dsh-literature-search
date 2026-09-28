@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.1] — 2026-09-28
+
+### Fixed
+
+- **0.3.0's rename broke the client bundle: the Settings card never loaded and
+  the desktop host disabled the bundle.** After the rename, the profile's
+  `cordis.patch.yml` row named `@astervolans/dsh-literature-search`, but
+  `lib/client.js` still registered itself as `dsh-literature-search`.
+
+  `@deepseek-ai/dsh-client-modules` keys a boot-graph row by the *package name*
+  the row resolved to and arrives it on that id: once the bundle script has run,
+  `arrive()` checks `factories.has(rowId)`. A factory filed under the pre-rename
+  id therefore looked like a bundle that "loaded without registering", so the
+  loader retried the row on its one-resource URL. The script executed a second
+  time, `register()` refused the duplicate, and the page aborted with
+
+  ```
+  Uncaught Error: client-modules: duplicate factory registration for
+    "dsh-literature-search" (bundle executed twice without invalidate?)
+  web boot: 1 entry did not activate
+  @astervolans/dsh-literature-search: import failed (see console for the import error)
+  ```
+
+  The desktop host then wrote the plugin into `desktopNextDeselectedBundles`
+  ("Disabled bundle for desktop") and restored a healthy start by leaving the
+  plugin switched off — which is what made the install look like "dsh will not
+  start". The registration id is now `package.json`'s `name`, matching the
+  convention the loader implements (its own bootstrap bundle registers
+  `@deepseek-ai/dsh-client-modules`).
+
+### Added
+
+- **Client-registration contract tests** in `test/client.test.mjs`. One asserts
+  the bundle's registration id equals `package.json#name`; the other replays the
+  loader's two load-bearing rules (a row is keyed by package name, a second
+  registration throws) against the real bundle, so the 0.3.0 failure mode is now
+  a red test instead of a broken boot. Verified by running the suite against the
+  shipped 0.3.0 bundle: both cases fail there and pass on the fix.
+
+### Changed
+
+- The 0.3.0 entry below claimed the rename left "the client module id" alone.
+  That claim was wrong and is the defect this release fixes — the client module
+  identity had to move with the package name, exactly like the patch row's
+  `name`. The README, the Chinese README and `cordis.patch.yml` now state which
+  identifiers stay unscoped and which two must be the scoped name.
+
 ## [0.3.0] — 2026-09-27
 
 ### Changed
@@ -19,9 +66,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The plugin's **runtime identity is deliberately unchanged**: the exported `name`
   (`literature-search`), the settings namespace, the `/plugin/literature-search`
-  route tree, the client module id, the `pubmedTool` value sent to NCBI and the
-  diagnostics directory (`$DSH_HOME/.dsh-literature-search`) all stay unscoped, so
-  an existing profile keeps its configuration and its saved keys.
+  route tree, the `pubmedTool` value sent to NCBI and the diagnostics directory
+  (`$DSH_HOME/.dsh-literature-search`) all stay unscoped, so an existing profile
+  keeps its configuration and its saved keys.
+
+  > **Corrected in 0.3.1:** this entry originally listed "the client module id"
+  > among the identifiers that stay unscoped. That was wrong — the client
+  > bundle's registration id must be the package name the loader resolves, and
+  > leaving it unscoped is what broke the Settings card and the web boot. See
+  > the 0.3.1 entry above.
 
   Two things had to move with the name, because the cordis loader resolves them:
   the `dsh.bundle.patch` row's `name` in `cordis.patch.yml` (the module specifier
@@ -221,7 +274,8 @@ inside a DSH workspace and are folded into this version.
   reports HTTP 429 / anti-bot pages as explicit errors rather than silently
   returning empty results.
 
-[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.3.1...HEAD
+[0.3.1]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.0
 [0.2.4]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.4
 [0.2.3]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.2.3

@@ -12,14 +12,21 @@
 > Packages only accepts scoped names, and the same scoped name is used on
 > npmjs.org so there is one install command for both registries.
 >
-> The plugin's **runtime identity stays unscoped** — the exported `name`
+> The plugin's **runtime identity is mostly unscoped** — the exported `name`
 > (`literature-search`), the settings namespace, the `/plugin/literature-search`
-> routes, the client module id and the `dsh.bundle.patch` row `id` are all
-> unchanged, so an existing profile keeps its configuration. Only the row's
-> `name` (the module specifier the cordis loader imports from the profile
-> directory, where only the scoped package exists) is scoped, and it must stay in
-> sync with `package.json` or `dsh web` aborts at startup with
-> `Cannot find package`. `test/config.test.mjs` fails the build if they drift.
+> routes and the `dsh.bundle.patch` row `id` are all unchanged, so an existing
+> profile keeps its configuration. Two identifiers are the *scoped* package name,
+> because DSH resolves both through the profile directory, where only the scoped
+> package exists:
+>
+> 1. the row's `name` — the module specifier the cordis loader imports. If it
+>    drifts from `package.json`, `dsh web` aborts at startup with
+>    `Cannot find package`; `test/config.test.mjs` fails the build if they drift.
+> 2. the client bundle's registration id in `lib/client.js` — the DSH client
+>    loader keys a boot-graph row by the package name it resolved, so a bundle
+>    filed under any other id leaves the row unarrived, gets retried, and aborts
+>    the page with `duplicate factory registration` (that is 0.3.0's startup
+>    defect, fixed in 0.3.1); `test/client.test.mjs` fails the build if they drift.
 
 A DeepSeek Harness (dsh) plugin that searches the literature through the
 **official PubMed NCBI E-utilities API** and **Google Scholar**, and returns
@@ -78,7 +85,10 @@ dsh plugin --profile desktop remove @astervolans/dsh-literature-search
 Upgrading from 0.2.x? The package was renamed from the unscoped
 `dsh-literature-search`, so remove the old one and add the scoped one. The plugin
 row `id`, the settings namespace and your saved keys are unaffected — the runtime
-identity did not change (see the note at the top).
+identity did not change (see the note at the top). If you installed **0.3.0**,
+upgrade to 0.3.1 before restarting: 0.3.0's client bundle still registered the
+pre-rename id, so the Settings card failed to load and the desktop host disabled
+the bundle.
 
 ### From GitHub Packages
 
@@ -313,10 +323,10 @@ node test/probe-scholar.mjs    # connectivity diagnosis: status / result blocks 
   symlinks them into `node_modules/`. This is what CI uses, on machines with no
   DSH installed (`.github/workflows/ci.yml` runs the full offline suite on
   Ubuntu and Windows across Node 22 and 24).
-- The offline suite is **62 cases**: MEDLINE parsing 7, Scholar parsing/paging
-  6, plugin and tools 21 (including "a settings write switches the Scholar
+- The offline suite is **66 cases**: MEDLINE parsing 7, Scholar parsing/paging
+  6, plugin and tools 24 (including "a settings write switches the Scholar
   backend live", "a credential written through the seam is picked up without a
-  restart" and live result limits), settings routes 14, client bundle 10 and
+  restart" and live result limits), settings routes 14, client bundle 11 and
   config drift 4. All of them use stub `fetch` and fake services — no network.
 - The client bundle suite drives a stub `window.__ModuleLoader__` plus a minimal
   React shim to actually execute and walk the render tree, which catches typos
@@ -325,7 +335,11 @@ node test/probe-scholar.mjs    # connectivity diagnosis: status / result blocks 
   function components for a deep render, so nodes owned by child components —
   such as the credential fields' buttons — are reachable from a test, and it
   guards the theme regressions directly: primary buttons must use paired
-  tokens, and `--dsw-alias-brand-primary` must never be a fill colour.
+  tokens, and `--dsw-alias-brand-primary` must never be a fill colour. Since
+  0.3.1 it also pins the registration contract that broke 0.3.0: the bundle must
+  file exactly one factory under `package.json#name`, and a second execution of
+  the same bundle must be the duplicate-registration crash rather than a
+  silent retry.
 - The live tests record **upstream unavailability** (no egress, DNS, timeouts,
   HTTP 429, anti-bot pages) as SKIP rather than FAIL, because that is an
   environment or policy problem. Only "the page contained result blocks but we

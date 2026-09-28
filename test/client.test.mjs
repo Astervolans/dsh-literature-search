@@ -6,8 +6,16 @@
  * bundle with a stub `window.__ModuleLoader__` and a minimal React shim, then
  * walks the rendered element tree — enough to catch a typo or an undefined
  * reference in the card without a browser.
+ *
+ * It also pins the registration *id* against `package.json#name`, because that
+ * pairing is what decides whether the DSH client loader ever arrives the row
+ * (see the regression test at the bottom of the file).
  */
+import { readFile } from 'node:fs/promises';
 import { createSuite, assert, isMain } from './harness.mjs';
+
+/** The manifest is the single source of truth for the client registration id. */
+const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
 /** Collect every string rendered anywhere in an element tree. */
 function collectStrings(node, out = []) {
@@ -91,24 +99,27 @@ function collectStyles(node, out = []) {
 /** Bumped per load so each test gets a fresh module instance. */
 let loadCounter = 0;
 
-/** Load the client bundle with a stub module loader; returns its exports + spec. */
-async function loadClientBundle(seedState) {
-	const captured = [];
+/** Execute the bundle once against `loader`, as one script tag would. */
+async function runClientBundle(loader) {
 	const previousWindow = globalThis.window;
-	globalThis.window = {
-		__ModuleLoader__: {
-			load(spec) {
-				captured.push(spec);
-			}
-		}
-	};
+	globalThis.window = { __ModuleLoader__: loader };
 	try {
-		// A unique query defeats the ESM cache, so every test re-evaluates the bundle.
+		// A unique query defeats the ESM cache, so every call re-evaluates the bundle.
 		loadCounter += 1;
 		await import(`../lib/client.js?load=${loadCounter}`);
 	} finally {
 		globalThis.window = previousWindow;
 	}
+}
+
+/** Load the client bundle with a stub module loader; returns its exports + spec. */
+async function loadClientBundle(seedState) {
+	const captured = [];
+	await runClientBundle({
+		load(spec) {
+			captured.push(spec);
+		}
+	});
 	assert.equal(captured.length, 1, 'the bundle must call window.__ModuleLoader__.load exactly once');
 	const spec = captured[0];
 	const { React, jsxRuntime } = createReactShim(seedState);
@@ -165,11 +176,48 @@ function readyState(overrides = {}) {
 
 const suite = createSuite('client bundle');
 
-suite.test('the bundle declares the plugin id and the cordis client face', async () => {
+suite.test('the bundle registers under the package name and declares the cordis client face', async () => {
 	const { spec, exports } = await loadClientBundle(readyState());
-	assert.equal(spec.id, 'dsh-literature-search');
+	// The DSH client loader asks for the row by the *package name* it resolved,
+	// so any other id leaves the row unarrived and the bundle is loaded twice.
+	assert.equal(spec.id, manifest.name, 'the client registration id must equal package.json#name');
 	assert.equal(typeof exports.apply, 'function');
 	assert.deepEqual(exports.inject, ['slots', 'connection']);
+});
+
+suite.test('one execution satisfies the loader row; the retry is the duplicate-registration failure', async () => {
+	// The two load-bearing rules of @deepseek-ai/dsh-client-modules, reduced to
+	// their observable behaviour: a boot-graph row is keyed by the package name
+	// the row resolved to, and registering the same factory twice aborts the
+	// page. `arrive(row)` runs the bundle, then asks whether *its* row id came
+	// back; on a miss it retries the one-resource URL, and that second
+	// execution is the failure users see as "1 entry did not activate".
+	//
+	// Regression guard for 0.3.0, where the bundle still filed itself under the
+	// pre-rename unscoped name while the profile row named the scoped package:
+	// the row never arrived, the retry threw
+	// `duplicate factory registration for "dsh-literature-search"`, and the
+	// desktop host disabled the bundle on the next start.
+	const factories = new Set();
+	const executed = [];
+	const loader = {
+		load(spec) {
+			executed.push(spec.id);
+			if (factories.has(spec.id)) {
+				throw new Error(
+					`client-modules: duplicate factory registration for "${spec.id}" (bundle executed twice without invalidate?)`
+				);
+			}
+			factories.add(spec.id);
+		}
+	};
+
+	await runClientBundle(loader);
+	assert.deepEqual(executed, [manifest.name], 'the bundle must file exactly one registration under the package name');
+	assert.equal(factories.has(manifest.name), true, `the loader row "${manifest.name}" must be registered by one execution`);
+
+	// `arrive()`'s fallback attempt on the same bundle — the crash this guards.
+	await assert.rejects(runClientBundle(loader), /duplicate factory registration/);
 });
 
 suite.test('apply() registers one settings tab with a stable id and label', async () => {
