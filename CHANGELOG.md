@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.3] — 2026-09-29
+
+### Fixed
+
+- **DSH 0.2.0 disabled the plugin outright.** Starting with 0.2.0, DSH
+  pre-flights every profile row before loading it:
+  `@deepseek-ai/dsh-app-boot`'s `evaluatePluginCompatibility()` tests each
+  `@deepseek-ai/dsh` / `@deepseek-ai/dsh-*` peer against the running runtime
+  with `includePrerelease` and disables the whole row when one fails. Both
+  declared peers were `^0.1.0-rc.6`, whose semantic upper bound is `<0.2.0`;
+  on a 0.2.0 host the bundle layer was skipped, so no `pubmed_*` / `scholar_*`
+  tool, no prompt-guidance section and no `/plugin/literature-search` route
+  existed at all. They are now `>=0.1.7-rc.1 <0.3.0`, covering the `0.1.7`
+  line and the whole `0.2.0` line. `@deepseek-ai/cordis` and
+  `@deepseek-ai/schemastery` are not gated and keep their ranges. No runtime
+  code changed: the settings page is already derived from the exported
+  `Config`, and the client bundle already registers under the scoped package
+  name.
+
 ## [0.3.2] — 2026-09-28
 
 ### Fixed
@@ -300,7 +319,8 @@ inside a DSH workspace and are folded into this version.
   reports HTTP 429 / anti-bot pages as explicit errors rather than silently
   returning empty results.
 
-[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.3.2...HEAD
+[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.3.3...HEAD
+[0.3.3]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.3
 [0.3.2]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.2
 [0.3.1]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.1
 [0.3.0]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.0
