@@ -1,5 +1,5 @@
 /**
- * HTTP surface tests for the Settings → Plugins card: the
+ * HTTP surface tests for the configuration page: the
  * `/plugin/literature-search` route tree, run against fake request/response
  * objects and fake settings/credentials services — no DSH host, no network.
  */

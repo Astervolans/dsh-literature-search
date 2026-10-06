@@ -1,21 +1,38 @@
 /**
  * Client-bundle contract tests.
  *
- * The Settings → Plugins card must load through the DSH module-loader envelope
- * and register into the `settings.plugins.tab` slot. This suite evaluates the
- * bundle with a stub `window.__ModuleLoader__` and a minimal React shim, then
- * walks the rendered element tree — enough to catch a typo or an undefined
- * reference in the card without a browser.
+ * The configuration page must load through the DSH module-loader envelope and
+ * register into the Plugins panel's `plugins.row.config` slot. This suite
+ * evaluates the bundle with a stub `window.__ModuleLoader__` and a minimal React
+ * shim, then walks the rendered element tree — enough to catch a typo or an
+ * undefined reference in the card without a browser.
  *
- * It also pins the registration *id* against `package.json#name`, because that
- * pairing is what decides whether the DSH client loader ever arrives the row
- * (see the regression test at the bottom of the file).
+ * It also pins the two identities the registration is keyed by, because either
+ * one drifting silently orphans the page:
+ *
+ *   * the module-loader `id` against `package.json#name`, which decides whether
+ *     the DSH client loader ever arrives the row (see the regression test in the
+ *     middle of the file);
+ *   * the slot `key` against `<package.json#name>#<row id in cordis.patch.yml>`,
+ *     which is the cell `@deepseek-ai/dsh-client-ui-plugin-manager` recomputes to
+ *     decide whether this bundle's row gets a configure control.
  */
 import { readFile } from 'node:fs/promises';
 import { createSuite, assert, isMain } from './harness.mjs';
 
 /** The manifest is the single source of truth for the client registration id. */
 const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
+
+/**
+ * The bundle row id, read from the patch the profile actually applies.
+ *
+ * Deliberately a light regex rather than the `yaml` dev link: this suite must
+ * run in a checkout where the dev-deps bootstrap has not been run (it is the
+ * only suite that guards the client bundle's load path). `config.test.mjs`
+ * parses the same file properly and pins `row.id` on its own.
+ */
+const patchText = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8');
+const rowId = /^\s*-\s*id:\s*([A-Za-z0-9._-]+)\s*$/m.exec(patchText)?.[1];
 
 /** Collect every string rendered anywhere in an element tree. */
 function collectStrings(node, out = []) {
@@ -220,7 +237,7 @@ suite.test('one execution satisfies the loader row; the retry is the duplicate-r
 	await assert.rejects(runClientBundle(loader), /duplicate factory registration/);
 });
 
-suite.test('apply() registers one settings tab with a stable id and label', async () => {
+suite.test('apply() registers the configuration on this bundle’s own row in the Plugins panel', async () => {
 	const { exports } = await loadClientBundle(readyState());
 	const injections = [];
 	const registrations = [];
@@ -236,25 +253,59 @@ suite.test('apply() registers one settings tab with a stable id and label', asyn
 		}
 	};
 	exports.apply(ctx);
-	assert.deepEqual(injections, ['settings.plugins.tab']);
+
+	// `plugins.row.config` is a keyed slot of the plugin manager's `main` panel
+	// entry. The old `settings.plugins.tab` cell is gone on purpose: the Plugins
+	// panel is the surface DSH documents for configuring plugins, and Settings →
+	// 内置插件 keeps only the built-in inventory.
+	assert.deepEqual(injections, ['plugins.row.config']);
 	assert.equal(registrations.length, 1);
-	assert.equal(registrations[0].options.name, 'settings.plugins.tab');
-	assert.equal(registrations[0].options.id, 'literature-search');
-	assert.equal(registrations[0].options.label, '文献检索');
-	assert.equal(typeof registrations[0].options.order, 'number');
+	assert.equal(registrations[0].options.name, 'plugins.row.config');
 	assert.equal(typeof registrations[0].component, 'function');
+	assert.equal('id' in registrations[0].options, false, 'a keyed slot takes `key`, not `id`');
+});
+
+suite.test('the slot key is `<package name>#<row id as cordis.patch.yml declares it>`', async () => {
+	// The plugin manager's `rowConfigKey(bundle, rowId)` builds this string from
+	// its own projection of the profile, and only the exact match gives the row
+	// its configure control. Both halves are pinned here: the bundle name comes
+	// from package.json (the loader resolves it), the row id from the patch.
+	const { exports } = await loadClientBundle(readyState());
+	assert.notEqual(rowId, undefined, 'cordis.patch.yml must declare exactly one inserted row id');
+	assert.equal(exports.CONFIG_KEY, `${manifest.name}#${rowId}`);
+	assert.equal(exports.CONFIG_KEY, '@astervolans/dsh-literature-search#literature-search');
+});
+
+suite.test('the slot component serves the manager’s two views', async () => {
+	const { exports } = await loadClientBundle(readyState());
+
+	// `summary` is the row's description fallback; it must be a plain value — the
+	// page fetches /config on mount, so rendering it here would double the read
+	// and could crash a row the panel renders before the host answers.
+	const summary = exports.LiteratureSearchConfig({ view: 'summary' });
+	assert.equal(typeof summary, 'string');
+	assert.match(summary, /PubMed/);
+
+	// `page` is the form, and an unknown/absent view must not silently render
+	// nothing — the panel's own JSX path always passes one, a future slot owner
+	// might not.
+	for (const props of [{ view: 'page' }, {}]) {
+		const tree = exports.LiteratureSearchConfig(props);
+		assert.equal(typeof tree, 'object');
+		assert.equal(tree.type, exports.LiteratureSearchPage);
+	}
 });
 
 suite.test('the loading phase renders a placeholder', async () => {
 	const { exports } = await loadClientBundle({ phase: 'loading' });
-	const tree = exports.LiteratureSettingsTab();
+	const tree = exports.LiteratureSearchPage();
 	const strings = collectStrings(tree).join(' | ');
 	assert.match(strings, /正在加载文献检索配置/);
 });
 
 suite.test('the ready phase renders every field group and action', async () => {
 	const { exports } = await loadClientBundle(readyState());
-	const tree = exports.LiteratureSettingsTab();
+	const tree = exports.LiteratureSearchPage();
 	const strings = collectStrings(tree).join('\n');
 	for (const expected of [
 		'PubMed（NCBI E-utilities）',
@@ -279,7 +330,7 @@ suite.test('the ready phase renders every field group and action', async () => {
 
 suite.test('the error phase renders the message and a retry button', async () => {
 	const { exports } = await loadClientBundle(readyState({ phase: 'error', saveErr: '加载配置失败：HTTP 503' }));
-	const strings = collectStrings(exports.LiteratureSettingsTab()).join(' | ');
+	const strings = collectStrings(exports.LiteratureSearchPage()).join(' | ');
 	assert.match(strings, /加载配置失败：HTTP 503/);
 	assert.match(strings, /重试/);
 });
@@ -293,7 +344,7 @@ suite.test('test results render with their hints', async () => {
 			]
 		})
 	);
-	const strings = collectStrings(exports.LiteratureSettingsTab()).join('\n');
+	const strings = collectStrings(exports.LiteratureSearchPage()).join('\n');
 	assert.match(strings, /E-utilities OK/);
 	assert.match(strings, /Google Scholar is unreachable/);
 });
@@ -305,7 +356,7 @@ suite.test('primary buttons stay legible in both themes', async () => {
 	// buttons unreadable, because `--dsw-alias-brand-primary` is near-white in
 	// dark mode.
 	const { exports } = await loadClientBundle(readyState());
-	const tree = renderDeep(exports.LiteratureSettingsTab());
+	const tree = renderDeep(exports.LiteratureSearchPage());
 	const buttons = collectNodes(tree, 'button');
 	assert.equal(buttons.length >= 2, true, `expected buttons in the card, found ${buttons.length}`);
 	const primary = buttons.filter((button) => /保存/.test(collectStrings(button).join('')));
@@ -322,7 +373,7 @@ suite.test('primary buttons stay legible in both themes', async () => {
 
 suite.test('no style paints a brand token behind a fixed colour', async () => {
 	const { exports } = await loadClientBundle(readyState());
-	const styles = collectStyles(renderDeep(exports.LiteratureSettingsTab()));
+	const styles = collectStyles(renderDeep(exports.LiteratureSearchPage()));
 	assert.equal(styles.length > 0, true);
 	for (const style of styles) {
 		const fill = String(style.background ?? style.backgroundColor ?? '');
@@ -332,7 +383,7 @@ suite.test('no style paints a brand token behind a fixed colour', async () => {
 
 suite.test('disabled buttons use the first-party 40% opacity', async () => {
 	const { exports } = await loadClientBundle(readyState());
-	const tree = renderDeep(exports.LiteratureSettingsTab());
+	const tree = renderDeep(exports.LiteratureSearchPage());
 	const buttons = collectNodes(tree, 'button');
 	// The empty key draft leaves "保存密钥" disabled.
 	const disabled = buttons.filter((button) => button.props.disabled === true);
@@ -345,7 +396,7 @@ suite.test('disabled buttons use the first-party 40% opacity', async () => {
 
 suite.test('status colours come from state tokens, not hardcoded hex', async () => {
 	const { exports } = await loadClientBundle(readyState());
-	const styles = collectStyles(renderDeep(exports.LiteratureSettingsTab()));
+	const styles = collectStyles(renderDeep(exports.LiteratureSearchPage()));
 	const flattened = styles.map((style) => `${style.color ?? ''}|${style.background ?? ''}`).join('\n');
 	assert.match(flattened, /--dsw-alias-state-(success|error|warn)-primary/);
 	// `--dsw-alias-label-error` does not exist in the theme, so it must not be used.

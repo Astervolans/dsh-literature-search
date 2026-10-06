@@ -7,7 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [0.3.3] — 2026-09-29
+## [0.3.3] — 2026-10-07
+
+### Changed
+
+- **The configuration page moved from Settings → 内置插件 to the Plugins panel.**
+  The client bundle used to contribute a tab to `settings.plugins.tab`, which put
+  the page beside the built-in inventory under **Settings → Built-in plugins** —
+  a section that only exists to *report* what a deployment ships. DSH's own
+  plugin manager is explicit about the split: the sidebar 插件 / Plugins panel is
+  where plugins are configured ("在这里配置官方插件，安装和管理其他插件。内置插件列表及运行状态可在
+  「设置 → 内置插件」中查看").
+
+  The page now registers into `plugins.row.config`, the keyed slot
+  `@deepseek-ai/dsh-client-ui-plugin-manager` declares for a row a bundle owns,
+  with the key `` `${package name}#${row id}` `` —
+  `@astervolans/dsh-literature-search#literature-search` here. That is the same
+  string the panel recomputes through its own `rowConfigKey(bundle, rowId)` to
+  decide whether a row gets a configure control, so the entry now appears where
+  it belongs: **插件 → `@astervolans/dsh-literature-search` → the
+  `literature-search` row**. Nothing else moved — the route tree, the
+  `literature-search` settings namespace, the credential slots and every saved
+  key are unchanged.
+
+  The slot owner asks for two views, so the bundle now renders
+  `PluginConfigViewProps.view`: a hook-free one-liner for `summary` (the row's
+  description fallback) and the full form for `page`. The branch is a component
+  boundary, not an early return inside the form, because a component that calls
+  `useState` and then returns a string would change its hook count between views.
+  `test/client.test.mjs` pins the slot name, the key (against `package.json` and
+  `cordis.patch.yml`, both halves), and the two views: a key mismatch costs the
+  row its configure control *without raising an error*, so a test is the only
+  place it can be caught before a user notices a row that cannot be opened.
 
 ### Fixed
 
@@ -25,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   code changed: the settings page is already derived from the exported
   `Config`, and the client bundle already registers under the scoped package
   name.
+
+  > 0.3.3 carries both changes. It was prepared on 2026-09-29 and never
+  > published — no `v0.3.3` tag, no GitHub release, nothing on npm — so the two
+  > shipped together rather than as a phantom version.
 
 ## [0.3.2] — 2026-09-28
 

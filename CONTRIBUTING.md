@@ -85,8 +85,8 @@ A blocked, throttled or unreachable upstream is reported as `SKIP`. Only
   helper over a package. The whole point of this plugin is that it drops into a
   DSH profile with no `npm install`.
 - **Never commit credentials.** Keys belong in `$DSH_HOME/.credentials.yaml`
-  (via the settings page) or in environment variables. `cordis.patch.yml` has
-  `pubmedApiKey` / `scholarSerpApiKey` fields — leave them empty.
+  (via the configuration page) or in environment variables. `cordis.patch.yml`
+  has `pubmedApiKey` / `scholarSerpApiKey` fields — leave them empty.
 - **Keep the two config surfaces in sync.** `cordis.patch.yml`, the embedded
   row in `install.ps1` and the `Config` schema in `lib/index.js` are checked by
   the `config` suite. Adding a key means touching all three.

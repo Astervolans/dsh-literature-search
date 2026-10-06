@@ -42,9 +42,10 @@ both backends as one shared `paper` shape.
 - **Zero runtime dependencies**: only the Node built-in `fetch` /
   `AbortSignal`. The `@deepseek-ai/*` packages come from the DSH runtime, so
   there is nothing to build and nothing extra to install.
-- **Settings page**: a dedicated card under **Settings → Plugins → Literature
-  Search** for NCBI / SerpApi keys, the Scholar backend, rate and result
-  limits, and a one-click connectivity test.
+- **Configuration page**: a dedicated page on the plugin's own row in the
+  sidebar's **Plugins** panel — open `@astervolans/dsh-literature-search` and
+  click the `literature-search` row — for NCBI / SerpApi keys, the Scholar
+  backend, rate and result limits, and a one-click connectivity test.
 
 > The API research behind these choices — parameters, rate limits, response
 > shapes, measured evidence and rejected alternatives — is written up in
@@ -87,8 +88,8 @@ Upgrading from 0.2.x? The package was renamed from the unscoped
 row `id`, the settings namespace and your saved keys are unaffected — the runtime
 identity did not change (see the note at the top). If you installed **0.3.0**,
 upgrade to 0.3.1 before restarting: 0.3.0's client bundle still registered the
-pre-rename id, so the Settings card failed to load and the desktop host disabled
-the bundle.
+pre-rename id, so the configuration page failed to load and the desktop host
+disabled the bundle.
 
 ### From GitHub Packages
 
@@ -155,10 +156,11 @@ Three ways to configure them. The plugin resolves in this order: inline config
 3. Inline in `cordis.patch.yml` via `pubmedApiKey` / `scholarSerpApiKey` —
    **not recommended**, because it is easy to commit by accident.
 
-## Settings page
+## Configuration page
 
-The client plugin (`lib/client.js`) registers a tab in the settings panel; the
-server side exposes `/plugin/literature-search` to back it:
+The client plugin (`lib/client.js`) registers this bundle's configuration into
+the **Plugins panel**, on the row `cordis.patch.yml` declares, and the server
+side exposes `/plugin/literature-search` to back it:
 
 | Route | Purpose |
 | --- | --- |
@@ -166,6 +168,46 @@ server side exposes `/plugin/literature-search` to back it:
 | `POST /plugin/literature-search/config` | Patch write fenced by `expectedRevision`; a conflict returns 409 |
 | `POST /plugin/literature-search/credential` | Writes or clears a key for a `slot` (`pubmed` / `scholar`) |
 | `POST /plugin/literature-search/test` | Actually runs a PubMed esearch and a Scholar search, and reports latency and outcome |
+
+### Where the page lives
+
+`@deepseek-ai/dsh-client-ui-plugin-manager` owns the sidebar's 插件 / Plugins
+panel and declares one slot per plugin-configuration cell. The one for a row a
+bundle declares is `plugins.row.config`, a **keyed** slot whose key is
+`` `${package name}#${row id}` `` — the same string the panel recomputes through
+its own `rowConfigKey(bundle, rowId)` to decide whether a row gets a configure
+control. This bundle therefore registers
+
+```js
+ctx.slots.inject('plugins.row.config', () =>
+  ctx.slots.register({ name: 'plugins.row.config', key: CONFIG_KEY }, LiteratureSearchConfig)
+);
+```
+
+with `CONFIG_KEY === '@astervolans/dsh-literature-search#literature-search'`
+(`package.json#name` + the patch row id). Change either half without changing the
+other and the page does not disappear loudly — the row simply stops being
+clickable, which is why `test/client.test.mjs` pins both halves against
+`package.json` and `cordis.patch.yml`.
+
+The slot owner renders the entry twice, so the component takes
+`PluginConfigViewProps.view`:
+
+| View | Rendered as | Here |
+| --- | --- | --- |
+| `summary` | the row's description fallback | a one-line string, no hooks and no fetch |
+| `page` | the row's configuration page | `LiteratureSearchPage`, the full form |
+
+The branch is a component boundary rather than an early return inside the page,
+because `LiteratureSearchPage` opens with `useState`; a component that calls
+hooks and then returns a string would change its hook count between the two views
+and take the page down.
+
+Settings → 内置插件 is **not** used: that section is the read-only inventory of
+what the deployment ships, and the panel's own copy points plugin configuration
+at the Plugins panel ("在这里配置官方插件，安装和管理其他插件。内置插件列表及运行状态可在
+「设置 → 内置插件」中查看"). 0.4.0 moved the page there from the
+`settings.plugins.tab` cell it occupied through 0.3.x.
 
 ### How the page is provided (DSH 2.x)
 
@@ -333,14 +375,14 @@ node test/probe-scholar.mjs    # connectivity diagnosis: status / result blocks 
   symlinks them into `node_modules/`. This is what CI uses, on machines with no
   DSH installed (`.github/workflows/ci.yml` runs the full offline suite on
   Ubuntu and Windows across Node 22 and 24).
-- The offline suite is **66 cases**: MEDLINE parsing 7, Scholar parsing/paging
+- The offline suite is **71 cases**: MEDLINE parsing 7, Scholar parsing/paging
   6, plugin and tools 24 (including "a settings write switches the Scholar
   backend live", "a credential written through the seam is picked up without a
-  restart" and live result limits), settings routes 14, client bundle 11 and
+  restart" and live result limits), settings routes 17, client bundle 13 and
   config drift 4. All of them use stub `fetch` and fake services — no network.
 - The client bundle suite drives a stub `window.__ModuleLoader__` plus a minimal
   React shim to actually execute and walk the render tree, which catches typos
-  and null dereferences in the settings page without a browser. It has already
+  and null dereferences in the configuration page without a browser. It has already
   paid for itself by finding a `state.drafts` null crash. Since 0.2.2 it expands
   function components for a deep render, so nodes owned by child components —
   such as the credential fields' buttons — are reachable from a test, and it
@@ -349,7 +391,9 @@ node test/probe-scholar.mjs    # connectivity diagnosis: status / result blocks 
   0.3.1 it also pins the registration contract that broke 0.3.0: the bundle must
   file exactly one factory under `package.json#name`, and a second execution of
   the same bundle must be the duplicate-registration crash rather than a
-  silent retry.
+  silent retry. Since 0.4.0 it pins the Plugins-panel cell as well — the slot
+  name, the `<package name>#<patch row id>` key, and the summary/page split —
+  because a key mismatch costs the row its configure control without any error.
 - The live tests record **upstream unavailability** (no egress, DNS, timeouts,
   HTTP 429, anti-bot pages) as SKIP rather than FAIL, because that is an
   environment or policy problem. Only "the page contained result blocks but we
@@ -364,7 +408,7 @@ dsh-literature-search/
 ├── lib/
 │   ├── index.js     # Plugin entry: Config / apply / runtime / settings namespace / prompt paragraph
 │   ├── web.js       # /plugin/literature-search routes: config, credentials, connectivity test
-│   ├── client.js    # Settings-page client plugin (window.__ModuleLoader__, no build step)
+│   ├── client.js    # Plugins-panel configuration page (window.__ModuleLoader__, no build step)
 │   ├── http.js      # Rate gate, timeout, retries, Retry-After, JSON/text decoding
 │   ├── paper.js     # Shared paper shape, output schema, rendering
 │   ├── medline.js   # MEDLINE text parsing (efetch rettype=medline)

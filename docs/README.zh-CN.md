@@ -38,7 +38,7 @@ DeepSeek Harness（dsh）插件：通过 **PubMed 官方 E-utilities API** 与 *
 - **Google Scholar 没有官方 API**：有 SerpApi key 时走 SerpApi 的 `google_scholar` 引擎；
   没有 key 时直接解析 `scholar.google.com` 的 HTML（会被 Google 限流/拦截，此时**明确报错**而不是静默返回空结果）。
 - **零运行时依赖**：只用 Node 内置 `fetch` / `AbortSignal`，`@deepseek-ai/*` 由 DSH 运行时提供，无需 `npm install`。
-- **设置界面**：在 **设置 → 插件 → 文献检索** 里有专属配置页，可直接填 NCBI / SerpAPI 密钥、切换 Scholar 后端、调速率与返回条数，并一键测试连通性。
+- **配置界面**：在侧边栏 **插件** 面板里打开 `@astervolans/dsh-literature-search`，点 `literature-search` 行进入专属配置页，可直接填 NCBI / SerpAPI 密钥、切换 Scholar 后端、调速率与返回条数，并一键测试连通性。
 
 > 详细的 API 调研（参数、速率、返回格式、实测证据、选型理由）见 [`docs/API-RESEARCH.md`](API-RESEARCH.md)。
 
@@ -118,9 +118,9 @@ node cli.mjs paper 33301246
 node cli.mjs scholar "base editing" --max 5          # 无 key 时走 HTML，时通时断，被拦会给出提示
 ```
 
-## 设置界面（设置 → 插件 → 文献检索）
+## 配置界面（侧边栏「插件」面板 → `literature-search` 行）
 
-客户端插件（`lib/client.js`）在设置面板注册一个标签页，服务端提供
+客户端插件（`lib/client.js`）把本 bundle 的配置挂到**插件面板**里自己那一行上，服务端提供
 `/plugin/literature-search` 路由支撑它：
 
 | 路由 | 用途 |
@@ -129,6 +129,37 @@ node cli.mjs scholar "base editing" --max 5          # 无 key 时走 HTML，时
 | `POST /plugin/literature-search/config` | 带 `expectedRevision` 的补丁写入；版本冲突返回 409 |
 | `POST /plugin/literature-search/credential` | 按 `slot`（`pubmed` / `scholar`）写入或清除密钥 |
 | `POST /plugin/literature-search/test` | 真跑一次 PubMed esearch 与 Scholar 检索，返回耗时与结果 |
+
+### 页面挂在哪里
+
+侧边栏 插件 面板由 `@deepseek-ai/dsh-client-ui-plugin-manager` 提供，它为「某个配置页」声明了
+若干插槽；bundle 自己那一行用的是 `plugins.row.config`——一个 **keyed** 插槽，key 为
+`` `${包名}#${行 id}` ``，正是面板用 `rowConfigKey(bundle, rowId)` 重算出来、用来判断这一行
+要不要给「配置」入口的同一个字符串。所以本插件注册的是：
+
+```js
+ctx.slots.inject('plugins.row.config', () =>
+  ctx.slots.register({ name: 'plugins.row.config', key: CONFIG_KEY }, LiteratureSearchConfig)
+);
+```
+
+其中 `CONFIG_KEY === '@astervolans/dsh-literature-search#literature-search'`（`package.json#name`
++ patch 里的行 id）。两边只改一个**不会报错**，只是那一行不再可点——所以
+`test/client.test.mjs` 会把这两半分别钉在 `package.json` 与 `cordis.patch.yml` 上。
+
+插槽所有者会渲染两次，因此组件接收 `PluginConfigViewProps.view`：
+
+| view | 面板用来渲染 | 本插件 |
+| --- | --- | --- |
+| `summary` | 该行描述的兜底文案 | 一行纯字符串，不调 hook、不发请求 |
+| `page` | 该行的配置页 | `LiteratureSearchPage`，完整表单 |
+
+分支刻意做成**组件边界**而不是页面内部的提前 return：`LiteratureSearchPage` 开头就是
+`useState`，一个「先调 hook 再返回字符串」的父组件会在两种 view 间改变 hook 数量，直接把页面搞崩。
+
+**设置 → 内置插件** 不再使用：那里是「本部署装了什么」的只读清单，面板自己的文案也把插件配置
+指向插件面板（「在这里配置官方插件，安装和管理其他插件。内置插件列表及运行状态可在「设置 → 内置插件」中查看」）。
+0.4.0 把配置页从 0.3.x 占用的 `settings.plugins.tab` 移到了这里。
 
 页面能力：
 
@@ -268,15 +299,17 @@ node test/probe-scholar.mjs    # 连通性诊断：status / 结果块数 / 是�
 - `tools/fetch-dev-deps.mjs` 走另一条路：按 `.dev-deps/package.json` 里钉住的版本
   从 npm 装同一批包，再软链到 `node_modules/`。适合没装 DSH Desktop 的机器和 CI
   （`.github/workflows/ci.yml` 在 Ubuntu + Windows × Node 22/24 上跑全部离线用例）。
-- 离线共 **66 个用例**：MEDLINE 解析 7、Scholar 解析/分页 6、插件与工具 24（含
+- 离线共 **71 个用例**：MEDLINE 解析 7、Scholar 解析/分页 6、插件与工具 24（含
   「settings 写入后 Scholar 即时切换后端」「凭据写入后无需重启生效」「实时条数上限」）、
-  设置路由 14、客户端 bundle 11、配置漂移 4。全部用桩 `fetch`/假服务，不联网。
+  设置路由 17、客户端 bundle 13、配置漂移 4。全部用桩 `fetch`/假服务，不联网。
 - 客户端 bundle 套件用桩 `window.__ModuleLoader__` + 极简 React shim 真正执行并遍历渲染树，
-  能在没有浏览器的情况下抓出设置页里的拼写错误与空引用（已借此修掉一个 `state.drafts` 空值崩溃）。
+  能在没有浏览器的情况下抓出配置页里的拼写错误与空引用（已借此修掉一个 `state.drafts` 空值崩溃）。
   0.2.2 起它会展开函数组件做深度渲染，因此子组件拥有的节点（如密钥字段的按钮）也能断言，
   并直接守住主题回归：主按钮必须用成对的 token、不得把 `--dsw-alias-brand-primary` 当填充色。
   0.3.1 起它还钉住把 0.3.0 打挂的注册契约：bundle 必须**只**以 `package.json#name` 注册一次工厂，
   而同一 bundle 的第二次执行必须是那条 duplicate-registration 崩溃，不能被当成静默重试。
+  0.4.0 起它进一步钉住插件面板那一格：插槽名、`<包名>#<patch 行 id>` 这个 key，以及
+  summary/page 的分工——key 对不上不会报错，只会让那一行失去「配置」入口。
 - 在线测试把**上游不可用**（无出网 / DNS / 超时 / HTTP 429 / 反爬页）记为 SKIP 而不是 FAIL，
   因为那是环境或对方策略问题；只有“页面里有结果块但解析出 0 条”才判失败。
   实测：Google Scholar HTML 5/5 通过；PubMed 在本机出网时好时坏，不通时会明确打印 SKIP 与原因。
@@ -288,7 +321,7 @@ dsh-literature-search/
 ├── lib/
 │   ├── index.js     # 插件入口：Config / apply / runtime / settings 命名空间 / 提示词段落
 │   ├── web.js       # /plugin/literature-search 路由：配置读写、密钥读写、连通性测试
-│   ├── client.js    # 设置页客户端插件（window.__ModuleLoader__，免构建）
+│   ├── client.js    # 插件面板配置页客户端插件（window.__ModuleLoader__，免构建）
 │   ├── http.js      # 限速闸门、超时、重试、Retry-After、JSON/文本解码
 │   ├── paper.js     # 统一 paper 结构、输出 schema、渲染
 │   ├── medline.js   # MEDLINE 文本解析（efetch rettype=medline）
@@ -323,7 +356,7 @@ dsh-literature-search/
 
 在被阻断的网络里，`scholar.google.com`（及其 `.com.hk` / `.co.jp` / `.de` 镜像）会直接
 `UND_ERR_CONNECT_TIMEOUT`，而 `serpapi.com` 与 `eutils.ncbi.nlm.nih.gov` 正常。
-最快的判断方式是设置页里的 **「测试 Google Scholar」** 按钮；命令行诊断脚本：
+最快的判断方式是配置页里的 **「测试 Google Scholar」** 按钮；命令行诊断脚本：
 
 ```powershell
 node test/probe-scholar.mjs
@@ -334,7 +367,7 @@ node test/probe-scholar.mjs
 - `ERR UND_ERR_CONNECT_TIMEOUT`：网络层被阻断 → 下面两条路二选一。
 
 **方案 A：配 SerpApi（推荐，稳定）**
-在设置页「Google Scholar」区块粘贴 SerpApi Key 并保存（写入 `$DSH_HOME/.credentials.yaml`），
+在配置页「Google Scholar」区块粘贴 SerpApi Key 并保存（写入 `$DSH_HOME/.credentials.yaml`），
 或在启动 DSH 的环境里设置 `SERPAPI_API_KEY`；`scholarProvider=auto` 会自动切到 SerpApi。
 
 **方案 B：走本机代理**
