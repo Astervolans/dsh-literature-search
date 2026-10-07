@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-10-07
+
+### Changed
+
+- **The configuration page moved up one level: from the bundle's row to the
+  bundle's own page.** 0.3.3 put it on `plugins.row.config`, so reaching it meant
+  opening `@astervolans/dsh-literature-search` and then clicking the
+  `literature-search` row — a control nested inside a list of components, for a
+  form that configures the package as a whole.
+
+  It now registers into **`plugins.bundle.config`**, keyed by the bundle's
+  **package name** rather than `` `${package name}#${row id}` ``. The plugin
+  manager renders that cell in `PackageDetail`, between the package's one-liner
+  and its row list, gated on `ledger.bundles.has(pkg.name)` — so the page is the
+  first thing on **插件 → `@astervolans/dsh-literature-search`**, above the rows.
+  Nothing depends on the patch row id any more. (`cordis.patch.yml` itself,
+  the routes, the settings namespace, the credential slots and every saved key
+  are unchanged.)
+
+  A wrong key still fails silently — the section just does not render — so
+  `test/client.test.mjs` pins it against `package.json#name`.
+
+- **PubMed, Google Scholar and 通用 are now three collapsible sections.** Each is
+  a `<button>` header (whole strip is the hit target, keyboard-reachable, native
+  focus ring left intact) plus a body that is not rendered while collapsed, built
+  by the new `ConfigSection`. The status badge stays in the header, so a folded
+  section still reports whether its key is configured.
+
+  The open state lives in the page as one `openSections` object instead of in
+  each section: a section owning its own `useState` could not be driven as a
+  group, and it would add one hook per section to a render path whose hook order
+  must stay fixed. A section counts as open unless explicitly collapsed, so a
+  partial state object renders expanded rather than blank.
+
+  All three start **expanded** — the page exists to make keys and backends
+  reachable, and collapsing everything by default would hide exactly that. To
+  flip that, seed `useState({ pubmed: false, scholar: false, general: false })`.
+
 ## [0.3.3] — 2026-10-07
 
 ### Changed
@@ -19,26 +57,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   where plugins are configured ("在这里配置官方插件，安装和管理其他插件。内置插件列表及运行状态可在
   「设置 → 内置插件」中查看").
 
-  The page now registers into `plugins.row.config`, the keyed slot
+  The page registered into `plugins.row.config`, the keyed slot
   `@deepseek-ai/dsh-client-ui-plugin-manager` declares for a row a bundle owns,
   with the key `` `${package name}#${row id}` `` —
-  `@astervolans/dsh-literature-search#literature-search` here. That is the same
-  string the panel recomputes through its own `rowConfigKey(bundle, rowId)` to
-  decide whether a row gets a configure control, so the entry now appears where
-  it belongs: **插件 → `@astervolans/dsh-literature-search` → the
-  `literature-search` row**. Nothing else moved — the route tree, the
-  `literature-search` settings namespace, the credential slots and every saved
-  key are unchanged.
+  `@astervolans/dsh-literature-search#literature-search` here. 0.4.0 moved it up
+  to the package page; this entry records where it first landed.
 
-  The slot owner asks for two views, so the bundle now renders
+  The slot owner asks for two views, so the bundle renders
   `PluginConfigViewProps.view`: a hook-free one-liner for `summary` (the row's
   description fallback) and the full form for `page`. The branch is a component
   boundary, not an early return inside the form, because a component that calls
   `useState` and then returns a string would change its hook count between views.
-  `test/client.test.mjs` pins the slot name, the key (against `package.json` and
-  `cordis.patch.yml`, both halves), and the two views: a key mismatch costs the
-  row its configure control *without raising an error*, so a test is the only
-  place it can be caught before a user notices a row that cannot be opened.
+  `test/client.test.mjs` pins the slot name, the key, and the two views: a key the
+  manager never dispatches costs the page its section *without raising an error*,
+  so a test is the only place it can be caught before a user notices.
 
 ### Fixed
 
@@ -56,10 +88,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   code changed: the settings page is already derived from the exported
   `Config`, and the client bundle already registers under the scoped package
   name.
-
-  > 0.3.3 carries both changes. It was prepared on 2026-09-29 and never
-  > published — no `v0.3.3` tag, no GitHub release, nothing on npm — so the two
-  > shipped together rather than as a phantom version.
 
 ## [0.3.2] — 2026-09-28
 
@@ -354,7 +382,8 @@ inside a DSH workspace and are folded into this version.
   reports HTTP 429 / anti-bot pages as explicit errors rather than silently
   returning empty results.
 
-[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.3.3...HEAD
+[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.4.0
 [0.3.3]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.3
 [0.3.2]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.2
 [0.3.1]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.1

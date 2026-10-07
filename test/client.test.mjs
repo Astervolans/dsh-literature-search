@@ -2,37 +2,30 @@
  * Client-bundle contract tests.
  *
  * The configuration page must load through the DSH module-loader envelope and
- * register into the Plugins panel's `plugins.row.config` slot. This suite
+ * register into the Plugins panel's `plugins.bundle.config` slot. This suite
  * evaluates the bundle with a stub `window.__ModuleLoader__` and a minimal React
  * shim, then walks the rendered element tree — enough to catch a typo or an
  * undefined reference in the card without a browser.
  *
- * It also pins the two identities the registration is keyed by, because either
- * one drifting silently orphans the page:
+ * It pins the two identities the registration depends on, because either one
+ * drifting silently orphans the page:
  *
  *   * the module-loader `id` against `package.json#name`, which decides whether
  *     the DSH client loader ever arrives the row (see the regression test in the
  *     middle of the file);
- *   * the slot `key` against `<package.json#name>#<row id in cordis.patch.yml>`,
- *     which is the cell `@deepseek-ai/dsh-client-ui-plugin-manager` recomputes to
- *     decide whether this bundle's row gets a configure control.
+ *   * the slot `key` against `package.json#name` too, because
+ *     `plugins.bundle.config` addresses a page by the *bundle's package name* —
+ *     the same string `@deepseek-ai/dsh-client-ui-plugin-manager` passes as
+ *     `entryKey` and gates the section on with `ledger.bundles.has(pkg.name)`.
+ *
+ * `cordis.patch.yml`'s row id plays no part in either one; `config.test.mjs`
+ * pins that file on its own.
  */
 import { readFile } from 'node:fs/promises';
 import { createSuite, assert, isMain } from './harness.mjs';
 
 /** The manifest is the single source of truth for the client registration id. */
 const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
-
-/**
- * The bundle row id, read from the patch the profile actually applies.
- *
- * Deliberately a light regex rather than the `yaml` dev link: this suite must
- * run in a checkout where the dev-deps bootstrap has not been run (it is the
- * only suite that guards the client bundle's load path). `config.test.mjs`
- * parses the same file properly and pins `row.id` on its own.
- */
-const patchText = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8');
-const rowId = /^\s*-\s*id:\s*([A-Za-z0-9._-]+)\s*$/m.exec(patchText)?.[1];
 
 /** Collect every string rendered anywhere in an element tree. */
 function collectStrings(node, out = []) {
@@ -237,7 +230,7 @@ suite.test('one execution satisfies the loader row; the retry is the duplicate-r
 	await assert.rejects(runClientBundle(loader), /duplicate factory registration/);
 });
 
-suite.test('apply() registers the configuration on this bundle’s own row in the Plugins panel', async () => {
+suite.test('apply() registers the configuration on this bundle’s page in the Plugins panel', async () => {
 	const { exports } = await loadClientBundle(readyState());
 	const injections = [];
 	const registrations = [];
@@ -254,34 +247,37 @@ suite.test('apply() registers the configuration on this bundle’s own row in th
 	};
 	exports.apply(ctx);
 
-	// `plugins.row.config` is a keyed slot of the plugin manager's `main` panel
-	// entry. The old `settings.plugins.tab` cell is gone on purpose: the Plugins
-	// panel is the surface DSH documents for configuring plugins, and Settings →
-	// 内置插件 keeps only the built-in inventory.
-	assert.deepEqual(injections, ['plugins.row.config']);
+	// `plugins.bundle.config` is a keyed slot of the plugin manager's `main` panel
+	// entry, and it is one level above the rows: the panel renders it on the
+	// *package* page ("the configuration the bundle registered for itself"), ahead
+	// of the package's row list. The `settings.plugins.tab` cell of 0.3.x is gone
+	// on purpose — the Plugins panel is the surface DSH documents for configuring
+	// plugins, and Settings → 内置插件 keeps only the built-in inventory.
+	assert.deepEqual(injections, ['plugins.bundle.config']);
 	assert.equal(registrations.length, 1);
-	assert.equal(registrations[0].options.name, 'plugins.row.config');
+	assert.equal(registrations[0].options.name, 'plugins.bundle.config');
 	assert.equal(typeof registrations[0].component, 'function');
 	assert.equal('id' in registrations[0].options, false, 'a keyed slot takes `key`, not `id`');
 });
 
-suite.test('the slot key is `<package name>#<row id as cordis.patch.yml declares it>`', async () => {
-	// The plugin manager's `rowConfigKey(bundle, rowId)` builds this string from
-	// its own projection of the profile, and only the exact match gives the row
-	// its configure control. Both halves are pinned here: the bundle name comes
-	// from package.json (the loader resolves it), the row id from the patch.
+suite.test('the slot key is the bundle package name', async () => {
+	// Unlike `plugins.row.config` — keyed `<package name>#<row id>`, which 0.3.3
+	// used — this cell is addressed by the package alone: the panel passes
+	// `entryKey: pkg.name` and gates the section on `ledger.bundles.has(pkg.name)`.
+	// The row id in `cordis.patch.yml` therefore plays no part here.
 	const { exports } = await loadClientBundle(readyState());
-	assert.notEqual(rowId, undefined, 'cordis.patch.yml must declare exactly one inserted row id');
-	assert.equal(exports.CONFIG_KEY, `${manifest.name}#${rowId}`);
-	assert.equal(exports.CONFIG_KEY, '@astervolans/dsh-literature-search#literature-search');
+	assert.equal(exports.CONFIG_KEY, manifest.name);
+	assert.equal(exports.CONFIG_KEY, '@astervolans/dsh-literature-search');
 });
 
 suite.test('the slot component serves the manager’s two views', async () => {
 	const { exports } = await loadClientBundle(readyState());
 
-	// `summary` is the row's description fallback; it must be a plain value — the
-	// page fetches /config on mount, so rendering it here would double the read
-	// and could crash a row the panel renders before the host answers.
+	// `plugins.bundle.config` only ever dispatches `view: "page"` (its contract
+	// says so), but the sibling `plugins.item` cell hands the same props shape to
+	// cards that must answer `summary`. That branch has to stay a plain value: the
+	// page fetches /config the moment it mounts, so answering a summary by
+	// rendering it would double the read.
 	const summary = exports.LiteratureSearchConfig({ view: 'summary' });
 	assert.equal(typeof summary, 'string');
 	assert.match(summary, /PubMed/);
@@ -296,6 +292,56 @@ suite.test('the slot component serves the manager’s two views', async () => {
 	}
 });
 
+suite.test('one section is a real disclosure the caller controls', async () => {
+	const { exports } = await loadClientBundle(readyState());
+
+	const toggles = [];
+	const open = exports.ConfigSection({
+		title: '通用',
+		badge: '已配置',
+		open: true,
+		onToggle: () => toggles.push('toggled'),
+		children: 'body-marker'
+	});
+	const [openHead, openBody] = open.props.children;
+	assert.equal(openHead.type, 'button', 'the header must be a button, so the disclosure is keyboard-reachable');
+	assert.equal(openHead.props['aria-expanded'], true);
+	assert.equal(collectStrings(openHead).includes('通用'), true);
+	assert.equal(collectStrings(openBody).includes('body-marker'), true);
+	openHead.props.onClick();
+	assert.deepEqual(toggles, ['toggled'], 'the header must call the caller\u2019s toggle');
+
+	// Collapsed: the body is gone, but the badge stays — a collapsed section still
+	// has to report whether its key is configured.
+	const closed = exports.ConfigSection({ title: '通用', badge: '已配置', open: false, onToggle: () => {}, children: 'body-marker' });
+	const [closedHead, closedBody] = closed.props.children;
+	assert.equal(closedHead.props['aria-expanded'], false);
+	assert.equal(closedBody, null);
+	assert.equal(collectStrings(closed).includes('body-marker'), false, 'a collapsed section must not render its fields');
+	assert.equal(collectStrings(closed).includes('已配置'), true);
+});
+
+suite.test('the page opens with all three sections expanded', async () => {
+	// Defaulting to collapsed would hide the keys and backends the page exists to
+	// make reachable, so the seed state is open for all three. The shim hands the
+	// page's first `useState` the seeded state and every later one its real
+	// initial, which is exactly where `openSections` lives.
+	const { exports } = await loadClientBundle(readyState());
+	const tree = renderDeep(exports.LiteratureSearchPage());
+	const heads = collectNodes(tree, 'button').filter((node) => 'aria-expanded' in node.props);
+	assert.equal(heads.length, 3, `expected three collapsible sections, found ${heads.length}`);
+	for (const head of heads) assert.equal(head.props['aria-expanded'], true);
+	const labels = heads.map((head) => collectStrings(head).join(''));
+	for (const expected of ['PubMed', 'Google Scholar', '通用']) {
+		assert.equal(labels.some((label) => label.includes(expected)), true, `expected a "${expected}" section header`);
+	}
+	// Every field is still reachable while they are open.
+	const strings = collectStrings(tree).join('\n');
+	assert.equal(strings.includes('NCBI API Key'), true);
+	assert.equal(strings.includes('SerpApi Key'), true);
+	assert.equal(strings.includes('默认返回条数'), true);
+});
+
 suite.test('the loading phase renders a placeholder', async () => {
 	const { exports } = await loadClientBundle({ phase: 'loading' });
 	const tree = exports.LiteratureSearchPage();
@@ -305,7 +351,9 @@ suite.test('the loading phase renders a placeholder', async () => {
 
 suite.test('the ready phase renders every field group and action', async () => {
 	const { exports } = await loadClientBundle(readyState());
-	const tree = exports.LiteratureSearchPage();
+	// Deep render: the section titles live on the `ConfigSection` element's own
+	// props, so only expanding the component puts them in the walked tree.
+	const tree = renderDeep(exports.LiteratureSearchPage());
 	const strings = collectStrings(tree).join('\n');
 	for (const expected of [
 		'PubMed（NCBI E-utilities）',

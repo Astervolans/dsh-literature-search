@@ -42,10 +42,11 @@ both backends as one shared `paper` shape.
 - **Zero runtime dependencies**: only the Node built-in `fetch` /
   `AbortSignal`. The `@deepseek-ai/*` packages come from the DSH runtime, so
   there is nothing to build and nothing extra to install.
-- **Configuration page**: a dedicated page on the plugin's own row in the
-  sidebar's **Plugins** panel — open `@astervolans/dsh-literature-search` and
-  click the `literature-search` row — for NCBI / SerpApi keys, the Scholar
-  backend, rate and result limits, and a one-click connectivity test.
+- **Configuration page**: on the plugin's own page in the sidebar's **Plugins**
+  panel — open `@astervolans/dsh-literature-search` and the page is at the top,
+  above its rows — split into three collapsible sections (PubMed / Google Scholar
+  / General) for the NCBI and SerpApi keys, the Scholar backend, rate and result
+  limits, and a one-click connectivity test.
 
 > The API research behind these choices — parameters, rate limits, response
 > shapes, measured evidence and rejected alternatives — is written up in
@@ -172,42 +173,54 @@ side exposes `/plugin/literature-search` to back it:
 ### Where the page lives
 
 `@deepseek-ai/dsh-client-ui-plugin-manager` owns the sidebar's 插件 / Plugins
-panel and declares one slot per plugin-configuration cell. The one for a row a
-bundle declares is `plugins.row.config`, a **keyed** slot whose key is
-`` `${package name}#${row id}` `` — the same string the panel recomputes through
-its own `rowConfigKey(bundle, rowId)` to decide whether a row gets a configure
-control. This bundle therefore registers
+panel and declares one slot per plugin-configuration cell. This bundle uses
+`plugins.bundle.config`, a **keyed** slot whose key is the **bundle's package
+name** — the page belongs to the package, not to one of its rows:
 
 ```js
-ctx.slots.inject('plugins.row.config', () =>
-  ctx.slots.register({ name: 'plugins.row.config', key: CONFIG_KEY }, LiteratureSearchConfig)
+ctx.slots.inject('plugins.bundle.config', () =>
+  ctx.slots.register({ name: 'plugins.bundle.config', key: CONFIG_KEY }, LiteratureSearchConfig)
 );
 ```
 
-with `CONFIG_KEY === '@astervolans/dsh-literature-search#literature-search'`
-(`package.json#name` + the patch row id). Change either half without changing the
-other and the page does not disappear loudly — the row simply stops being
-clickable, which is why `test/client.test.mjs` pins both halves against
-`package.json` and `cordis.patch.yml`.
+with `CONFIG_KEY === '@astervolans/dsh-literature-search'` (`package.json#name`).
+The panel renders it in `PackageDetail` between the package's one-liner and its
+row list, gated on `ledger.bundles.has(pkg.name)` — so **插件 →
+`@astervolans/dsh-literature-search`** shows the configuration at the top of the
+page, above the `literature-search` row.
 
-The slot owner renders the entry twice, so the component takes
-`PluginConfigViewProps.view`:
+Change the key and nothing errors: the section simply does not render. That is
+why `test/client.test.mjs` pins it against `package.json#name`.
 
-| View | Rendered as | Here |
-| --- | --- | --- |
-| `summary` | the row's description fallback | a one-line string, no hooks and no fetch |
-| `page` | the row's configuration page | `LiteratureSearchPage`, the full form |
-
-The branch is a component boundary rather than an early return inside the page,
-because `LiteratureSearchPage` opens with `useState`; a component that calls
-hooks and then returns a string would change its hook count between the two views
-and take the page down.
+> 0.3.3 first put this page on the *row* (`plugins.row.config`, keyed
+> `` `${package name}#${row id}` ``, reached by clicking the row). 0.4.0 moved it
+> one level up. Unlike the row cell, `plugins.bundle.config` asks for
+> `view: "page"` only — it never requests the `summary` one-liner — but the
+> component keeps answering both, because the sibling `plugins.item` cell hands
+> the same props shape to cards that must.
 
 Settings → 内置插件 is **not** used: that section is the read-only inventory of
 what the deployment ships, and the panel's own copy points plugin configuration
 at the Plugins panel ("在这里配置官方插件，安装和管理其他插件。内置插件列表及运行状态可在
-「设置 → 内置插件」中查看"). 0.4.0 moved the page there from the
-`settings.plugins.tab` cell it occupied through 0.3.x.
+「设置 → 内置插件」中查看").
+
+### The three sections
+
+PubMed, Google Scholar and 通用 are three collapsible sections built by
+`ConfigSection`: a `<button>` header (so the disclosure is keyboard-reachable and
+the whole strip is the hit target) plus a body that is absent while collapsed.
+
+The open state lives in the page as one `openSections` object rather than in each
+section, for two reasons: a section owning its own `useState` could not be driven
+as a group, and it would add one hook per section to a render path whose hook
+order must stay fixed. A section is open unless it was explicitly collapsed, so a
+partial state object renders expanded rather than blank.
+
+All three start **expanded** — the page exists to make keys and backends
+reachable, and collapsing everything by default would hide exactly that. The
+status badge stays in the header while collapsed, so a folded section still tells
+you whether its key is configured. To default them closed instead, seed
+`useState({ pubmed: false, scholar: false, general: false })`.
 
 ### How the page is provided (DSH 2.x)
 
@@ -375,10 +388,10 @@ node test/probe-scholar.mjs    # connectivity diagnosis: status / result blocks 
   symlinks them into `node_modules/`. This is what CI uses, on machines with no
   DSH installed (`.github/workflows/ci.yml` runs the full offline suite on
   Ubuntu and Windows across Node 22 and 24).
-- The offline suite is **71 cases**: MEDLINE parsing 7, Scholar parsing/paging
+- The offline suite is **73 cases**: MEDLINE parsing 7, Scholar parsing/paging
   6, plugin and tools 24 (including "a settings write switches the Scholar
   backend live", "a credential written through the seam is picked up without a
-  restart" and live result limits), settings routes 17, client bundle 13 and
+  restart" and live result limits), settings routes 17, client bundle 15 and
   config drift 4. All of them use stub `fetch` and fake services — no network.
 - The client bundle suite drives a stub `window.__ModuleLoader__` plus a minimal
   React shim to actually execute and walk the render tree, which catches typos
@@ -391,9 +404,12 @@ node test/probe-scholar.mjs    # connectivity diagnosis: status / result blocks 
   0.3.1 it also pins the registration contract that broke 0.3.0: the bundle must
   file exactly one factory under `package.json#name`, and a second execution of
   the same bundle must be the duplicate-registration crash rather than a
-  silent retry. Since 0.4.0 it pins the Plugins-panel cell as well — the slot
-  name, the `<package name>#<patch row id>` key, and the summary/page split —
-  because a key mismatch costs the row its configure control without any error.
+  silent retry. Since 0.3.3 it pins the Plugins-panel cell as well — the slot
+  name, the key, and the summary/page split — because a key the manager never
+  dispatches costs the page its section without raising anything. Since 0.4.0 it
+  also drives the three-section disclosure: the header is a button carrying
+  `aria-expanded`, a collapsed section renders no fields but keeps its status
+  badge, and the page seeds all three open.
 - The live tests record **upstream unavailability** (no egress, DNS, timeouts,
   HTTP 429, anti-bot pages) as SKIP rather than FAIL, because that is an
   environment or policy problem. Only "the page contained result blocks but we
