@@ -216,11 +216,11 @@ as a group, and it would add one hook per section to a render path whose hook
 order must stay fixed. A section is open unless it was explicitly collapsed, so a
 partial state object renders expanded rather than blank.
 
-All three start **expanded** — the page exists to make keys and backends
-reachable, and collapsing everything by default would hide exactly that. The
-status badge stays in the header while collapsed, so a folded section still tells
-you whether its key is configured. To default them closed instead, seed
-`useState({ pubmed: false, scholar: false, general: false })`.
+All three start **collapsed**: the page reads as a table of contents first — three
+headers carrying their status badges say what the plugin is doing — and you open
+only the group you came to change. The badge stays in the header while collapsed,
+so a folded section still tells you whether its key is configured. To default them
+open instead, seed `useState({ pubmed: true, scholar: true, general: true })`.
 
 ### How the page is provided (DSH 2.x)
 
@@ -409,7 +409,7 @@ node test/probe-scholar.mjs    # connectivity diagnosis: status / result blocks 
   dispatches costs the page its section without raising anything. Since 0.4.0 it
   also drives the three-section disclosure: the header is a button carrying
   `aria-expanded`, a collapsed section renders no fields but keeps its status
-  badge, and the page seeds all three open.
+  badge, and the page seeds all three collapsed.
 - The live tests record **upstream unavailability** (no egress, DNS, timeouts,
   HTTP 429, anti-bot pages) as SKIP rather than FAIL, because that is an
   environment or policy problem. Only "the page contained result blocks but we

@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-10-07
+
+### Added
+
+- **A plugin icon.** The manifest now declares a top-level `"icon": "./icon.svg"`,
+  and the file ships in `files`. `@deepseek-ai/dsh-app-boot`'s `readPluginMeta()`
+  resolves `<name>/package.json` through the Node ESM resolver, turns that field
+  into an image data URL, and hands it to the Plugins panel — which renders it in
+  the bundle's card (36 px), its detail page header (36 px), and its component
+  rows (30 px, inside a 40 px frame). No plugin code runs to produce it.
+
+  The artwork is the project's own mark. Its export is Affinity-authored: the
+  root `viewBox` is rewritten to the smallest **square** box centred on the
+  artwork (a non-square viewBox letterboxes inside the panel's
+  `object-fit: contain` box and renders smaller), and the external DTD reference
+  is dropped — an `<img>` neither parses nor fetches it, but it reads as a remote
+  resource. Both are framing changes only; the drawing is untouched.
+
+  `test/config.test.mjs` guards every rule the Host enforces, because each one
+  fails silently at runtime — a bad icon keeps the title and description and only
+  adds a metadata diagnostic, and an undecodable image falls back to the built-in
+  artwork. The guards cover the relative path, the four accepted extensions, a
+  regular file, the 256 KiB ceiling, presence in `files`, `./package.json` being
+  open in `exports`, a square viewBox, and no `currentColor` or external
+  reference.
+
+### Changed
+
+- **The three settings sections now start collapsed.** 0.4.0 seeded all three
+  open, on the theory that the page exists to make keys and backends reachable.
+  In practice the page is read far more often than it is edited, and an expanded
+  form buries the thing a reader actually wants: the two status badges saying
+  whether a key is configured and which Scholar backend is live. It now reads as a
+  table of contents first — three headers with their badges — and you open only
+  the group you came to change.
+
+  Nothing else about the disclosure moves: the header is still the `<button>`
+  carrying `aria-expanded`, a collapsed section still renders no fields, and the
+  badge still stays in the header. Only the seed changed, from
+  `{ pubmed: true, scholar: true, general: true }` to all-`false`.
+
+  `test/client.test.mjs` flips with it: the default-state test now asserts every
+  header is collapsed, that the badges are still rendered, and that no field of
+  any group is in the tree — while the tests that inspect fields or the credential
+  buttons render the page with the sections forced open, which also pins the
+  page's `useState` call order.
+
 ## [0.4.0] — 2026-10-07
 
 ### Changed
@@ -382,7 +429,8 @@ inside a DSH workspace and are folded into this version.
   reports HTTP 429 / anti-bot pages as explicit errors rather than silently
   returning empty results.
 
-[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/Astervolans/dsh-literature-search/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.4.1
 [0.4.0]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.4.0
 [0.3.3]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.3
 [0.3.2]: https://github.com/Astervolans/dsh-literature-search/releases/tag/v0.3.2

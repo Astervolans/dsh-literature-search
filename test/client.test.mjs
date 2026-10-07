@@ -46,8 +46,18 @@ function collectStrings(node, out = []) {
 	return out;
 }
 
+/**
+ * The page's `useState` call order: 1 the main state object, 2 `busy`, 3
+ * `openSections`, 4 the force-render counter. The shim hands call 1 the seeded
+ * state and every later call its real initial, so overriding call 3 is how a test
+ * renders the page with the sections expanded — which is also a guard on that
+ * order: move `openSections` and the sections silently render collapsed, failing
+ * the assertions that look for the fields.
+ */
+const SECTIONS_STATE_CALL = 3;
+
 /** Minimal React shim seeded with one state value so the card renders. */
-function createReactShim(seedState) {
+function createReactShim(seedState, overrides = {}) {
 	const createElement = (type, props) => ({ type, props: props ?? {} });
 	let useStateCalls = 0;
 	const React = {
@@ -55,7 +65,8 @@ function createReactShim(seedState) {
 		// useState calls (the per-slot key drafts) must get their real initial.
 		useState: (initial) => {
 			useStateCalls += 1;
-			return [useStateCalls === 1 ? seedState : initial, () => {}];
+			const value = useStateCalls === 1 ? seedState : (overrides[useStateCalls] ?? initial);
+			return [value, () => {}];
 		},
 		useEffect: () => {},
 		useCallback: (fn) => fn,
@@ -123,7 +134,7 @@ async function runClientBundle(loader) {
 }
 
 /** Load the client bundle with a stub module loader; returns its exports + spec. */
-async function loadClientBundle(seedState) {
+async function loadClientBundle(seedState, stateOverrides) {
 	const captured = [];
 	await runClientBundle({
 		load(spec) {
@@ -132,7 +143,7 @@ async function loadClientBundle(seedState) {
 	});
 	assert.equal(captured.length, 1, 'the bundle must call window.__ModuleLoader__.load exactly once');
 	const spec = captured[0];
-	const { React, jsxRuntime } = createReactShim(seedState);
+	const { React, jsxRuntime } = createReactShim(seedState, stateOverrides);
 	const exports = spec.factory((name) => {
 		if (name === 'react') return React;
 		if (name === 'react/jsx-runtime') return jsxRuntime;
@@ -140,6 +151,9 @@ async function loadClientBundle(seedState) {
 	});
 	return { spec, exports };
 }
+
+/** The three sections, all expanded — what the page looks like after three clicks. */
+const ALL_SECTIONS_OPEN = { [SECTIONS_STATE_CALL]: { pubmed: true, scholar: true, general: true } };
 
 /** A realistic "ready" tab state as /config would deliver it. */
 function readyState(overrides = {}) {
@@ -321,25 +335,28 @@ suite.test('one section is a real disclosure the caller controls', async () => {
 	assert.equal(collectStrings(closed).includes('已配置'), true);
 });
 
-suite.test('the page opens with all three sections expanded', async () => {
-	// Defaulting to collapsed would hide the keys and backends the page exists to
-	// make reachable, so the seed state is open for all three. The shim hands the
-	// page's first `useState` the seeded state and every later one its real
-	// initial, which is exactly where `openSections` lives.
+suite.test('the page opens with all three sections collapsed', async () => {
+	// The page reads as a table of contents first: three headers carrying their
+	// status badges, and only the group you came for gets opened.
 	const { exports } = await loadClientBundle(readyState());
 	const tree = renderDeep(exports.LiteratureSearchPage());
 	const heads = collectNodes(tree, 'button').filter((node) => 'aria-expanded' in node.props);
 	assert.equal(heads.length, 3, `expected three collapsible sections, found ${heads.length}`);
-	for (const head of heads) assert.equal(head.props['aria-expanded'], true);
+	for (const head of heads) assert.equal(head.props['aria-expanded'], false, 'every section must start collapsed');
 	const labels = heads.map((head) => collectStrings(head).join(''));
 	for (const expected of ['PubMed', 'Google Scholar', '通用']) {
 		assert.equal(labels.some((label) => label.includes(expected)), true, `expected a "${expected}" section header`);
 	}
-	// Every field is still reachable while they are open.
+	// The badges stay visible, so the collapsed page still reports state...
 	const strings = collectStrings(tree).join('\n');
-	assert.equal(strings.includes('NCBI API Key'), true);
-	assert.equal(strings.includes('SerpApi Key'), true);
-	assert.equal(strings.includes('默认返回条数'), true);
+	assert.equal(strings.includes('免密钥可用'), true);
+	assert.equal(strings.includes('SerpApi 已配置'), true);
+	// ...while no field of any group is rendered.
+	for (const hidden of ['NCBI API Key', 'SerpApi Key', '默认返回条数', '后端选择（scholarProvider）']) {
+		assert.equal(strings.includes(hidden), false, `"${hidden}" belongs to a collapsed section and must not render`);
+	}
+	// The action row is not a section and stays reachable either way.
+	assert.equal(strings.includes('保存并应用'), true);
 });
 
 suite.test('the loading phase renders a placeholder', async () => {
@@ -350,7 +367,7 @@ suite.test('the loading phase renders a placeholder', async () => {
 });
 
 suite.test('the ready phase renders every field group and action', async () => {
-	const { exports } = await loadClientBundle(readyState());
+	const { exports } = await loadClientBundle(readyState(), ALL_SECTIONS_OPEN);
 	// Deep render: the section titles live on the `ConfigSection` element's own
 	// props, so only expanding the component puts them in the walked tree.
 	const tree = renderDeep(exports.LiteratureSearchPage());
@@ -403,7 +420,9 @@ suite.test('primary buttons stay legible in both themes', async () => {
 	// both swap together per theme. A literal white label is what made the
 	// buttons unreadable, because `--dsw-alias-brand-primary` is near-white in
 	// dark mode.
-	const { exports } = await loadClientBundle(readyState());
+	// The credential fields — and their save buttons — live inside the sections, so
+	// this guard needs them open.
+	const { exports } = await loadClientBundle(readyState(), ALL_SECTIONS_OPEN);
 	const tree = renderDeep(exports.LiteratureSearchPage());
 	const buttons = collectNodes(tree, 'button');
 	assert.equal(buttons.length >= 2, true, `expected buttons in the card, found ${buttons.length}`);
@@ -430,7 +449,7 @@ suite.test('no style paints a brand token behind a fixed colour', async () => {
 });
 
 suite.test('disabled buttons use the first-party 40% opacity', async () => {
-	const { exports } = await loadClientBundle(readyState());
+	const { exports } = await loadClientBundle(readyState(), ALL_SECTIONS_OPEN);
 	const tree = renderDeep(exports.LiteratureSearchPage());
 	const buttons = collectNodes(tree, 'button');
 	// The empty key draft leaves "保存密钥" disabled.
